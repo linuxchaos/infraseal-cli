@@ -1,0 +1,101 @@
+# Installation And First Run
+
+InfraSeal is designed to be downloaded beside or inside an existing GitHub repository and run locally. Native evaluation, governance checks, ISO readiness mapping, and reports work without a cloud login.
+
+## Build From Source
+
+Requirements: Git and Go 1.24 or newer.
+
+```bash
+git clone https://github.com/linuxchaos/infraseal-cli.git
+cd infraseal-cli
+go test ./...
+go build -o bin/infraseal ./cmd/infraseal
+```
+
+On macOS:
+
+```bash
+brew install go node python terraform
+git clone https://github.com/linuxchaos/infraseal-cli.git
+cd infraseal-cli
+go test ./...
+go build -o bin/infraseal ./cmd/infraseal
+./bin/infraseal version
+```
+
+On Windows:
+
+```powershell
+go build -o bin/infraseal.exe ./cmd/infraseal
+$env:PATH += ";$PWD\bin"
+infraseal version
+```
+
+To install from source into your Go binary directory:
+
+```bash
+go install github.com/linuxchaos/infraseal-cli/cmd/infraseal@latest
+```
+
+If your shell cannot find `infraseal`, add the Go binary directory to `PATH`:
+
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+## Use It In Another Repository
+
+```bash
+cd path/to/customer-ai-repository
+/path/to/infraseal init
+/path/to/infraseal doctor
+/path/to/infraseal scan --profile quick
+/path/to/infraseal compliance iso42001
+/path/to/infraseal compliance nist-ai-rmf
+/path/to/infraseal compliance aiuc1
+```
+
+You do not copy or reference the sample YAML. `init` generates a configuration owned by the repository you are assessing. When `.infraseal/infraseal.yaml` is used, relative input and target paths resolve from that repository's root.
+
+After initialization:
+
+1. Set `project.name`, `project.type`, `project.purpose`, and `project.owner`.
+2. Replace the starter evidence and test cases with real repository-specific material.
+3. Set `inputs.prompts`, `inputs.evidence`, `inputs.test_cases`, `inputs.agent_skills`, `inputs.include`, `inputs.exclude`, and `inputs.targets` to files that actually exist in the repository.
+4. Add governance evidence files under `.infraseal/governance/` or update the YAML paths to your existing policy/risk/approval documentation.
+5. Set `output.formats` to any combination of `json`, `markdown`, `html`, `csv`, and `pdf`.
+6. Run `infraseal doctor` before the first scan.
+
+To avoid generating starter files, create a YAML configuration manually and pass it with `--config`. If the config is not inside a `.infraseal` directory, relative paths resolve from the directory containing that config.
+
+## What `infraseal init` Does
+
+It creates only local starter files:
+
+```text
+.infraseal/
+  infraseal.yaml
+  evidence/knowledge-base.md
+  evidence/tfplan.json
+  governance/*.md
+  test-cases/*.yaml
+  agent-skills/skill-manifest.yaml
+  reports/
+prompts/system.md
+```
+
+It does not install tools, upload source code, call a model provider, create an account, or run a scan. The generated YAML tells MCPvia where the repository's prompts, evidence, tests, skills, and optional target exports live.
+
+## Immediate Zero-Configuration Path
+
+1. Run `infraseal init`.
+2. Replace starter evidence and test content with repository-specific files.
+3. Update paths and project metadata in `.infraseal/infraseal.yaml`.
+4. Run `infraseal doctor`.
+5. Optional: generate Terraform plan evidence with `terraform plan -out=tfplan.bin && terraform show -json tfplan.bin > infra/tfplan.json`.
+6. Run `infraseal scan --profile quick`.
+7. Run `infraseal compliance iso42001`.
+8. Run `infraseal compliance nist-ai-rmf` or `infraseal compliance aiuc1` when those views are useful to the team.
+
+Optional backend integrations add depth. They are not required for MCPvia native checks or local reports. See `scanner-integrations.md` for those requirements.

@@ -1,0 +1,9 @@
+name: support-knowledge-search
+description: Search approved support evidence.
+permissions:
+  filesystem:
+    - .infraseal/evidence/**
+  network: []
+requires_human_approval:
+  - external_data_transfer
+  - account_change

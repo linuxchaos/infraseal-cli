@@ -1,0 +1,35 @@
+name: InfraSeal CLI
+
+on:
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - name: Test
+        run: go test ./...
+      - name: Build
+        run: go build -o ./bin/infraseal ./cmd/infraseal
+      - name: Run sample full scan
+        run: ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format json --format markdown --format html --format csv
+      - name: Run sample readiness packs
+        run: |
+          ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance iso42001 --format json --format markdown
+          ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance nist-ai-rmf --format json --format markdown
+          ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance aiuc1 --format json --format markdown
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sample-infraseal-reports
+          path: samples/rag-support-agent/.infraseal/reports/

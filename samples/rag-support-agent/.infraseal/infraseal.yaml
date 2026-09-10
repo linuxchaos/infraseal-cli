@@ -1,0 +1,88 @@
+project:
+    name: rag-support-agent
+    type: rag-agent
+    purpose: Customer support assistant grounded in approved product policy.
+    owner: ""
+scan_profiles:
+    - quick
+    - iso42001
+runtime:
+    preferred: local
+    fallback: local
+inputs:
+    prompts:
+        - prompts/system.md
+    evidence:
+        - .infraseal/evidence/knowledge-base.md
+    test_cases:
+        - .infraseal/test-cases/*.yaml
+    agent_skills:
+        - .infraseal/agent-skills/
+    targets:
+        - exports/chatbot-responses.jsonl
+        - app/
+        - infra/tfplan.json
+    include:
+        - prompts/
+        - app/
+        - exports/
+        - infra/
+        - .infraseal/agent-skills/
+    exclude:
+        - .git/**
+        - .github/**
+        - .infraseal/reports/**
+        - node_modules/**
+        - vendor/**
+        - dist/**
+        - build/**
+        - .next/**
+        - .venv/**
+        - venv/**
+        - coverage/**
+        - tmp/**
+        - '**/*.png'
+        - '**/*.jpg'
+        - '**/*.jpeg'
+        - '**/*.gif'
+        - '**/*.pdf'
+        - '**/*.zip'
+        - '**/*.exe'
+        - '**/*.dll'
+    terraform_plan_json:
+        - infra/tfplan.json
+output:
+    formats:
+        - json
+        - markdown
+        - html
+        - csv
+settings:
+    show_tool_details: false
+    block_on_critical: true
+    minimum_readiness_score: 80
+    allow_mocked_scanners: true
+governance:
+    data_owner: Support Platform Data Steward
+    approval_workflow: Security reviewer and support data owner must approve full-scan report before production release.
+    human_review_required: true
+    evaluation_cadence: Weekly production-output sampling and full scan before release.
+    reevaluate_on_change: true
+    policy_path: .infraseal/governance/ai-policy.md
+    risk_register: .infraseal/governance/risk-register.md
+    impact_assessment: .infraseal/governance/impact-assessment.md
+    model_card: .infraseal/governance/model-card.md
+    data_lineage: .infraseal/governance/data-lineage.md
+    human_oversight_plan: .infraseal/governance/human-oversight-plan.md
+    monitoring_plan: .infraseal/governance/monitoring-plan.md
+    change_management: .infraseal/governance/change-management.md
+    incident_response_runbook: .infraseal/governance/incident-response.md
+    vendor_review: .infraseal/governance/vendor-review.md
+    training_records: .infraseal/governance/training-records.md
+    user_disclosure: .infraseal/governance/user-disclosure.md
+    audit_log: .infraseal/governance/audit-log.md
+    remediation_tracking: GitHub issues with owner, due date, and closure evidence
+scanners:
+    hallbayes_backend: dummy
+    disabled: []
+    options: {}

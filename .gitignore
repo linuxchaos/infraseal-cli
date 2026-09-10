@@ -1,0 +1,8 @@
+/bin/
+/.infraseal/reports/
+**/.infraseal/reports/artifacts/
+**/.infraseal/reports/latest.json
+**/.infraseal/reports/scan-*
+**/.infraseal/reports/iso42001-*
+**/.infraseal/reports/nist-ai-rmf-*
+**/.infraseal/reports/aiuc1-*

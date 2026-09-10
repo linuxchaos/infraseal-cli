@@ -1,0 +1,49 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.0",
+  "resource_changes": [
+    {
+      "address": "aws_security_group_rule.rag_api_public_ssh",
+      "mode": "managed",
+      "type": "aws_security_group_rule",
+      "name": "rag_api_public_ssh",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "type": "ingress",
+          "from_port": 22,
+          "to_port": 22,
+          "protocol": "tcp",
+          "cidr_blocks": ["0.0.0.0/0"]
+        }
+      }
+    },
+    {
+      "address": "aws_db_instance.chat_history",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "chat_history",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "publicly_accessible": true,
+          "storage_encrypted": false,
+          "username": "support_app",
+          "password": "demo-password-in-plan"
+        }
+      }
+    },
+    {
+      "address": "aws_iam_policy.agent_tools",
+      "mode": "managed",
+      "type": "aws_iam_policy",
+      "name": "agent_tools",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+        }
+      }
+    }
+  ]
+}
