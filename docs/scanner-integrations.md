@@ -2,7 +2,7 @@
 
 This is the only InfraSeal document that intentionally names backend tools. End-user CLI output and generated reports use InfraSeal capability labels instead.
 
-None of these tools is required to run MCPvia native checks, targeted text checks, governance assessment, ISO readiness, or local reports. Install only the coverage relevant to the repository.
+None of these tools is required to run MCPvia native checks, targeted text checks, deterministic grounding checks, Terraform plan review, governance assessment, ISO readiness, or local reports. Install only the coverage relevant to the repository. Missing dependencies are reported as unavailable and do not create synthetic findings.
 
 ## Promptfoo
 
@@ -13,7 +13,7 @@ npm install -g promptfoo
 promptfoo --version
 ```
 
-Add `promptfooconfig.yaml` or `.infraseal/promptfooconfig.yaml`. A provider or deterministic local provider must be configured according to Promptfoo documentation. Without that file, InfraSeal uses declared local test cases when `allow_mocked_scanners: true` and labels the mode `mocked`.
+Add `promptfooconfig.yaml` or `.infraseal/promptfooconfig.yaml`. A provider or deterministic local provider must be configured according to Promptfoo documentation. Without that file, InfraSeal marks this capability disabled and records no findings from this adapter.
 
 ## Giskard
 
@@ -23,7 +23,7 @@ Purpose: privacy, bias, robustness, and model regression evaluation.
 python -m pip install "giskard[llm]"
 ```
 
-Giskard needs a model function or endpoint and a dataset. The current CLI detects the dependency and uses local fixtures until a repository-specific model binding is supplied. No production endpoint is called implicitly.
+Giskard needs a model function or endpoint and a dataset. The current CLI detects the dependency and marks the capability disabled until a repository-specific model binding is supplied. No production endpoint is called implicitly.
 
 ## RAGAS
 
@@ -33,7 +33,7 @@ Purpose: faithfulness, context precision, context recall, and RAG quality.
 python -m pip install ragas
 ```
 
-RAGAS usually needs exported question/answer/context/reference rows and, depending on metrics, model or embedding credentials. InfraSeal's offline sample remains fixture-backed unless that evaluation binding is configured.
+RAGAS usually needs exported question/answer/context/reference rows and, depending on metrics, model or embedding credentials. InfraSeal marks this capability missing or disabled until that evaluation binding is configured.
 
 ## DeepEval
 
@@ -71,9 +71,9 @@ export BERRY_VERIFIER_MODEL="gpt-4.1-mini"
 berry mcp --transport stdio --project-root /path/to/repository
 ```
 
-The current InfraSeal CLI supports the deterministic dummy workflow and detects Berry availability, but it does not yet invoke `detect_hallucination` over MCP. Until that binding is completed, reports explicitly label Berry-backed semantic verification as unavailable and offline cases as `mocked`.
+The current InfraSeal CLI supports the deterministic local workflow and detects Berry availability, but it does not yet invoke `detect_hallucination` over MCP. Until that binding is completed, reports explicitly label Berry-backed semantic verification as disabled and local evidence checks as `native`.
 
-The offline dummy workflow can use real production chatbot exports. It deterministically resolves evidence and applies explicit `supported` or `unsupported_claim` labels; it does not send data to OpenAI.
+The local workflow can use real production chatbot exports. It deterministically resolves evidence and applies explicit `supported` or `unsupported_claim` labels; it does not send data to OpenAI. This is not a semantic model judge. It proves whether declared claims are backed by the supplied evidence file and keeps the source evidence in the report artifact.
 
 Official project: https://github.com/leochlon/hallbayes
 
@@ -88,7 +88,7 @@ skillspector --help
 
 ## Microsoft Agent Governance Toolkit
 
-Purpose: agent policy, approval gates, budget policy, and decision trails. It is a governance plugin, not a sandbox security boundary. The CLI currently represents this integration with declared governance fixtures until a compatible policy bundle is configured.
+Purpose: agent policy, approval gates, budget policy, and decision trails. It is a governance plugin, not a sandbox security boundary. The CLI currently detects this capability and records it as missing until a compatible policy bundle is configured.
 
 ## Guard0 g0
 
@@ -142,3 +142,7 @@ infraseal scan --profile full --include-tool-details
 ```
 
 The public commands report capability status without backend names. Use this document when operator-level dependency troubleshooting is required.
+
+## Pass/Fail Samples
+
+The `samples/tool-cases/` directory includes small passing and failing inputs for Promptfoo, Hallbayes/Berry local grounding, SkillSpector/g0 agent analysis, gosec, govulncheck, and Terraform plan JSON. Run those samples before wiring a new repository into CI.

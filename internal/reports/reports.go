@@ -55,7 +55,10 @@ func (s *Service) GenerateScan(root string, result *schema.ScanResult, formats [
 			return nil, err
 		}
 	}
-	if err := writeLatest(dir, schema.StoredResult{Kind: "scan", Scan: result}); err != nil {
+	if err := writeLatest(dir, "latest.json", schema.StoredResult{Kind: "scan", Scan: result}); err != nil {
+		return nil, err
+	}
+	if err := writeLatest(dir, "latest-scan.json", schema.StoredResult{Kind: "scan", Scan: result}); err != nil {
 		return nil, err
 	}
 	return paths, nil
@@ -95,7 +98,10 @@ func (s *Service) GenerateCompliance(root string, result *schema.ComplianceResul
 			return nil, err
 		}
 	}
-	if err := writeLatest(dir, schema.StoredResult{Kind: "compliance", Compliance: result}); err != nil {
+	if err := writeLatest(dir, "latest.json", schema.StoredResult{Kind: "compliance", Compliance: result}); err != nil {
+		return nil, err
+	}
+	if err := writeLatest(dir, "latest-compliance.json", schema.StoredResult{Kind: "compliance", Compliance: result}); err != nil {
 		return nil, err
 	}
 	return paths, nil
@@ -218,12 +224,12 @@ func compliancePrefix(framework string) string {
 	}
 }
 
-func writeLatest(dir string, stored schema.StoredResult) error {
+func writeLatest(dir, name string, stored schema.StoredResult) error {
 	data, err := json.MarshalIndent(stored, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "latest.json"), data, 0o644)
+	return os.WriteFile(filepath.Join(dir, name), data, 0o644)
 }
 
 func scanMarkdown(result schema.ScanResult, includeTools bool) string {
@@ -252,7 +258,7 @@ func scanMarkdown(result schema.ScanResult, includeTools bool) string {
 		fmt.Fprintf(&b, "- `%s`\n", path)
 	}
 	if includeTools {
-		writeMarkdownTools(&b, result.ToolResults)
+		writeMarkdownToolsWithTitle(&b, result.ToolResults, "Evaluation Provenance", "")
 	}
 	b.WriteString("\n---\nInfraSeal CLI report. Powered by MCPvia.\n")
 	return b.String()
@@ -291,7 +297,7 @@ func complianceMarkdown(result schema.ComplianceResult, includeTools bool) strin
 		fmt.Fprintf(&b, "- `%s`\n", path)
 	}
 	if includeTools {
-		writeMarkdownTools(&b, result.ToolResults)
+		writeMarkdownToolsWithTitle(&b, result.ToolResults, "Readiness Evidence Provenance", "This readiness command did not execute scanner adapters. Entries below were loaded from the latest technical scan.")
 	}
 	b.WriteString("\n## Official References\n\n")
 	for _, reference := range result.References {
@@ -318,8 +324,11 @@ func writeMarkdownRecommendations(b *strings.Builder, items []schema.Recommendat
 	}
 }
 
-func writeMarkdownTools(b *strings.Builder, tools []schema.ToolResult) {
-	b.WriteString("\n## Evaluation Provenance\n\n")
+func writeMarkdownToolsWithTitle(b *strings.Builder, tools []schema.ToolResult, title, note string) {
+	b.WriteString("\n## " + title + "\n\n")
+	if strings.TrimSpace(note) != "" {
+		fmt.Fprintf(b, "%s\n\n", note)
+	}
 	b.WriteString("| InfraSeal capability | Status | Mode | Detail |\n|---|---|---|---|\n")
 	for _, tool := range tools {
 		fmt.Fprintf(b, "| %s | %s | %s | %s |\n", cell(tool.DisplayName), tool.Status, tool.Mode, cell(tool.Detail))

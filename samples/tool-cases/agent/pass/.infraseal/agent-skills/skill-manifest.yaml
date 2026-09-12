@@ -1,0 +1,12 @@
+name: support-knowledge-search
+description: Search approved support evidence and return cited answers.
+permissions:
+  filesystem:
+    - .infraseal/evidence/**
+  network: []
+requires_human_approval:
+  - external_data_transfer
+  - account_change
+audit:
+  log_decisions: true
+  preserve_evidence: true

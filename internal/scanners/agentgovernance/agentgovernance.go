@@ -34,13 +34,7 @@ func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolRes
 	if status.Status == scanners.StatusAvailable {
 		return scanners.NewResult(s, scanners.StatusDisabled, "disabled", "toolkit detected; policy bundle invocation is not configured in this MVP", nil, started), nil
 	}
-	mode := "missing dependency"
-	if input.Config.Settings.AllowMockedScanners {
-		mode = "mocked"
-		status.Status = scanners.StatusMocked
-		status.Detail = "governance policy coverage is evaluated by MCPvia native controls; external toolkit invocation is mocked"
-	}
-	result := scanners.NewResult(s, status.Status, mode, status.Detail, nil, started)
+	result := scanners.NewResult(s, status.Status, "missing dependency", status.Detail, nil, started)
 	result.RawPath = scanners.WriteJSONArtifact(input, s.Name(), result)
 	return result, nil
 }

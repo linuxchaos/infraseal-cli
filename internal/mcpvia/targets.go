@@ -167,6 +167,26 @@ func nativeTargetFindings(root string, targets, checks, excludes []string) []sch
 				}
 			}
 		}
+		if containsCheck(checks, "agent-safety") {
+			lower := strings.ToLower(text)
+			patterns := []string{
+				"network: [\"*\"]",
+				"network:\n    - \"*\"",
+				"requires_human_approval: []",
+				"data_exfiltration",
+				"send_to_external",
+				"credential_dump",
+				"secrets: read",
+				"aws:*",
+				"disable approval",
+			}
+			for _, pattern := range patterns {
+				if strings.Contains(lower, pattern) {
+					findings = append(findings, targetedFinding("critical", "agent-safety", "Risky agent skill pattern detected in target", pattern, rel, "Restrict tool permissions, require human approval for external side effects, and document the agent boundary."))
+					break
+				}
+			}
+		}
 	}
 	return findings
 }

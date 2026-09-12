@@ -1,0 +1,26 @@
+project:
+  name: agent-fail-sample
+  type: agent
+runtime:
+  preferred: local
+  fallback: local
+inputs:
+  agent_skills:
+    - .infraseal/agent-skills/
+  targets:
+    - .infraseal/agent-skills/
+  include:
+    - .infraseal/agent-skills/
+  exclude:
+    - .git/**
+    - .infraseal/reports/**
+output:
+  formats: [json, markdown, csv]
+settings:
+  block_on_critical: true
+  minimum_readiness_score: 80
+  allow_mocked_scanners: false
+scanners:
+  hallbayes_backend: dummy
+  disabled: []
+  options: {}

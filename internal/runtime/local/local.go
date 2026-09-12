@@ -38,7 +38,7 @@ func (p Provider) Execute(ctx context.Context, adapters []scanners.Scanner, inpu
 			for item := range jobs {
 				result, err := item.scanner.Scan(ctx, input)
 				if err != nil {
-					result = schema.ToolResult{Name: item.scanner.Name(), DisplayName: item.scanner.DisplayName(), Status: scanners.StatusError, Mode: "error", Detail: err.Error()}
+					result = schema.ToolResult{Name: item.scanner.Name(), DisplayName: scanners.PublicName(item.scanner.Name()), Status: scanners.StatusError, Mode: "error", Detail: err.Error()}
 				}
 				results[item.index] = result
 			}

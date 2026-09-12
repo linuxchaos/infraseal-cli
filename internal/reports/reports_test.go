@@ -3,6 +3,7 @@ package reports
 import (
 	"encoding/csv"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,9 @@ func TestGenerateAndRegenerateScanReports(t *testing.T) {
 			t.Fatalf("%s report missing or empty: %v", format, err)
 		}
 	}
+	if _, err := os.Stat(filepath.Join(root, ".infraseal", "reports", "latest-scan.json")); err != nil {
+		t.Fatalf("latest scan pointer missing: %v", err)
+	}
 	path, err := service.Regenerate(root, "markdown", true)
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +45,7 @@ func TestScanCSVWritesOneQuotedRowPerFinding(t *testing.T) {
 			ID: "grounding-1", Severity: "high", Domain: "Grounding", Category: "hallucination",
 			Title: "Unsupported refund claim", Description: "Answer conflicts with policy.",
 			Evidence: "Answer: 90 days\nPolicy: 14 days, conditional", Recommendation: "Correct the answer.",
-			FilePath: "exports/responses.csv", Line: 2, ExecutionMode: "mocked", SourceTool: "private-backend",
+			FilePath: "exports/responses.csv", Line: 2, ExecutionMode: "native", SourceTool: "private-backend",
 		}},
 	}
 	paths, err := New().GenerateScan(root, result, []string{"csv"}, true)

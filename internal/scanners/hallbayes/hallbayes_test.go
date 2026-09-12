@@ -30,7 +30,7 @@ func TestDummyBackendResolvesEvidenceBeforeFlaggingClaim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Mode != "mocked" || len(result.Findings) != 1 {
+	if result.Mode != "native" || len(result.Findings) != 1 {
 		t.Fatalf("unexpected result: %s, %d findings", result.Mode, len(result.Findings))
 	}
 	if !strings.Contains(result.Findings[0].Evidence, "14 days") {

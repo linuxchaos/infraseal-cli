@@ -33,14 +33,7 @@ func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolRes
 	started := time.Now().UTC()
 	status := s.IsAvailable(ctx, input.Config)
 	if status.Status != scanners.StatusAvailable {
-		mode := "missing dependency"
-		resultStatus := status.Status
-		if status.Status == scanners.StatusMissingDependency && input.Config.Settings.AllowMockedScanners {
-			mode = "mocked"
-			resultStatus = scanners.StatusMocked
-		}
-		findings := scanners.FixtureFindings(input, categories(), s.Name(), mode)
-		result := scanners.NewResult(s, resultStatus, mode, status.Detail, findings, started)
+		result := scanners.NewResult(s, status.Status, "missing dependency", status.Detail, nil, started)
 		result.RawPath = scanners.WriteJSONArtifact(input, s.Name(), result)
 		return result, nil
 	}
@@ -51,16 +44,10 @@ func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolRes
 		filepath.Join(input.RootDir, "promptfoo.yaml"),
 	)
 	if configPath == "" {
-		if input.Config.Settings.AllowMockedScanners && len(input.TestCases) > 0 {
-			findings := scanners.FixtureFindings(input, categories(), s.Name(), "mocked")
-			result := scanners.NewResult(s, scanners.StatusMocked, "mocked", "prompt evaluation is represented by declared local test-case fixtures; no model endpoint was called", findings, started)
-			result.RawPath = scanners.WriteJSONArtifact(input, s.Name(), result)
-			return result, nil
-		}
 		return scanners.NewResult(s, scanners.StatusDisabled, "disabled", "prompt evaluator is installed, but no compatible configuration is present", nil, started), nil
 	}
 	outfile := filepath.Join(input.ArtifactsDir, "promptfoo-output.json")
-	output, exitCode, err := scanners.RunCommand(ctx, input.RootDir, "promptfoo", "eval", "-c", configPath, "--no-progress-bar", "--no-table", "--output", outfile)
+	output, exitCode, err := scanners.RunCommand(ctx, input.RootDir, "promptfoo", "eval", "-c", configPath, "--no-progress-bar", "--no-table", "--no-cache", "--no-write", "--max-concurrency", "1", "--output", outfile)
 	stdout := scanners.WriteArtifact(input, s.Name(), "stdout.txt", output)
 	data, readErr := os.ReadFile(outfile)
 	if readErr != nil {

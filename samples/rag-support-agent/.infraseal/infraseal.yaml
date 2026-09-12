@@ -2,7 +2,7 @@ project:
     name: rag-support-agent
     type: rag-agent
     purpose: Customer support assistant grounded in approved product policy.
-    owner: ""
+    owner: Support Platform Owner
 scan_profiles:
     - quick
     - iso42001
@@ -61,7 +61,6 @@ settings:
     show_tool_details: false
     block_on_critical: true
     minimum_readiness_score: 80
-    allow_mocked_scanners: true
 governance:
     data_owner: Support Platform Data Steward
     approval_workflow: Security reviewer and support data owner must approve full-scan report before production release.

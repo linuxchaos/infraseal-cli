@@ -2,6 +2,8 @@
 /.infraseal/reports/
 **/.infraseal/reports/artifacts/
 **/.infraseal/reports/latest.json
+**/.infraseal/reports/latest-scan.json
+**/.infraseal/reports/latest-compliance.json
 **/.infraseal/reports/scan-*
 **/.infraseal/reports/iso42001-*
 **/.infraseal/reports/nist-ai-rmf-*

@@ -1,0 +1,25 @@
+project:
+  name: govulncheck-fail-sample
+  type: ai-service
+runtime:
+  preferred: local
+  fallback: local
+inputs:
+  targets:
+    - app/
+  include:
+    - app/
+  exclude:
+    - .git/**
+    - .infraseal/reports/**
+    - vendor/**
+output:
+  formats: [json, markdown, csv]
+settings:
+  block_on_critical: true
+  minimum_readiness_score: 100
+  allow_mocked_scanners: false
+scanners:
+  hallbayes_backend: dummy
+  disabled: []
+  options: {}

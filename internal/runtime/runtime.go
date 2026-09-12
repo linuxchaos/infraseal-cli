@@ -38,5 +38,5 @@ func (r Resolver) Resolve(ctx context.Context, preferred, fallback string) (Prov
 
 func DisabledResult(scanner scanners.Scanner, cfg config.Config) schema.ToolResult {
 	status := scanner.IsAvailable(context.Background(), cfg)
-	return schema.ToolResult{Name: scanner.Name(), DisplayName: scanner.DisplayName(), Status: status.Status, Mode: "disabled", Detail: status.Detail}
+	return schema.ToolResult{Name: scanner.Name(), DisplayName: scanners.PublicName(scanner.Name()), Status: status.Status, Mode: "disabled", Detail: status.Detail}
 }

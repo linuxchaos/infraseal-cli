@@ -28,10 +28,10 @@ func (s Scanner) IsAvailable(_ context.Context, cfg config.Config) schema.Scanne
 		return schema.ScannerStatus{Name: s.Name(), DisplayName: s.DisplayName(), Status: scanners.StatusDisabled, Detail: "disabled in configuration", Categories: categories()}
 	}
 	if strings.EqualFold(cfg.Scanners.HallbayesBackend, "dummy") {
-		return schema.ScannerStatus{Name: s.Name(), DisplayName: s.DisplayName(), Status: scanners.StatusMocked, Detail: "dummy backend enabled for local evidence/answer validation", Categories: categories()}
+		return schema.ScannerStatus{Name: s.Name(), DisplayName: s.DisplayName(), Status: scanners.StatusAvailable, Detail: "native deterministic evidence/answer validation enabled", Categories: categories()}
 	}
 	if strings.TrimSpace(os.Getenv("HALLBAYES_BACKEND_KEY")) == "" {
-		return schema.ScannerStatus{Name: s.Name(), DisplayName: s.DisplayName(), Status: "missing_backend_key", Detail: "HALLBAYES_BACKEND_KEY is not set", InstallHint: "Configure a Berry backend or set scanners.hallbayes_backend: dummy for local fixtures", Categories: categories()}
+		return schema.ScannerStatus{Name: s.Name(), DisplayName: s.DisplayName(), Status: "missing_backend_key", Detail: "HALLBAYES_BACKEND_KEY is not set", InstallHint: "Configure a Berry backend or set scanners.hallbayes_backend: dummy for local evidence checks", Categories: categories()}
 	}
 	if path, ok := scanners.CommandAvailable("berry"); ok {
 		return schema.ScannerStatus{Name: s.Name(), DisplayName: s.DisplayName(), Status: scanners.StatusAvailable, Detail: path, Categories: categories()}
@@ -42,14 +42,15 @@ func (s Scanner) IsAvailable(_ context.Context, cfg config.Config) schema.Scanne
 func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolResult, error) {
 	started := time.Now().UTC()
 	status := s.IsAvailable(ctx, input.Config)
-	if status.Status != scanners.StatusMocked {
+	if status.Status != scanners.StatusAvailable {
 		mode := "missing dependency"
-		if status.Status == scanners.StatusAvailable {
+		if status.Status == scanners.StatusDisabled {
 			mode = "disabled"
-			status.Status = scanners.StatusDisabled
-			status.Detail = "Berry is available, but the MCP detect_hallucination binding is not enabled in this MVP"
 		}
 		return scanners.NewResult(s, status.Status, mode, status.Detail, nil, started), nil
+	}
+	if !strings.EqualFold(input.Config.Scanners.HallbayesBackend, "dummy") {
+		return scanners.NewResult(s, scanners.StatusDisabled, "disabled", "Berry is available, but the MCP detect_hallucination binding is not enabled in this MVP", nil, started), nil
 	}
 
 	var findings []schema.Finding
@@ -115,8 +116,8 @@ func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolRes
 		}
 		cases = append(cases, map[string]any{"id": item.ID, "source": item.Source, "answer": item.Answer, "resolved_evidence": evidence, "evidence_source": evidenceSource, "supported": !unsupported})
 	}
-	result := scanners.NewResult(s, scanners.StatusMocked, "mocked", "dummy backend resolved evidence files and evaluated configured answer claims; Berry MCP was not invoked", findings, started)
-	result.RawPath = scanners.WriteJSONArtifact(input, s.Name(), map[string]any{"backend": "dummy", "berry_mcp_invoked": false, "cases": cases, "findings": findings})
+	result := scanners.NewResult(s, scanners.StatusAvailable, "native", "deterministic backend resolved evidence files and evaluated configured answer claims; Berry MCP was not invoked", findings, started)
+	result.RawPath = scanners.WriteJSONArtifact(input, s.Name(), map[string]any{"backend": "native", "berry_mcp_invoked": false, "cases": cases, "findings": findings})
 	return result, nil
 }
 

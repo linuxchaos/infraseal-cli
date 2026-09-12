@@ -43,3 +43,31 @@ func TestTerraformPlanScannerFindsRuntimeAndGovernanceRisks(t *testing.T) {
 		}
 	}
 }
+
+func TestTerraformPlanScannerPassesCleanPlan(t *testing.T) {
+	root := t.TempDir()
+	plan := filepath.Join(root, "tfplan.json")
+	if err := os.WriteFile(plan, []byte(`{
+  "format_version": "1.2",
+  "resource_changes": [
+    {"address":"aws_security_group_rule.private","type":"aws_security_group_rule","change":{"actions":["create"],"after":{"type":"ingress","from_port":443,"to_port":443,"cidr_blocks":["10.0.0.0/16"]}}},
+    {"address":"aws_db_instance.chat","type":"aws_db_instance","change":{"actions":["create"],"after":{"publicly_accessible":false,"storage_encrypted":true}}},
+    {"address":"aws_iam_policy.agent","type":"aws_iam_policy","change":{"actions":["create"],"after":{"policy":"{\"Statement\":[{\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::ai-evidence/*\"]}]}"} }}
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := New().Scan(context.Background(), scanners.Input{
+		RootDir: root,
+		Config:  config.Config{Inputs: config.InputsConfig{TerraformPlanJSON: []string{"tfplan.json"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != scanners.StatusAvailable || result.Mode != "real" {
+		t.Fatalf("unexpected result mode/status: %#v", result)
+	}
+	if len(result.Findings) != 0 {
+		t.Fatalf("expected no findings for clean plan, got %#v", result.Findings)
+	}
+}

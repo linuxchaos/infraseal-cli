@@ -2,8 +2,6 @@ name: InfraSeal CLI
 
 on:
   pull_request:
-    paths-ignore:
-      - "**/*.md"
   workflow_dispatch:
   push:
     branches:
@@ -17,17 +15,66 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: "1.24.x"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Install evaluator CLIs
+        run: |
+          npm install -g promptfoo@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Install optional agent analyzer
+        continue-on-error: true
+        run: |
+          python3 -m pip install --user git+https://github.com/NVIDIA/SkillSpector.git
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Test
         run: go test ./...
+      - name: Vet
+        run: go vet ./...
       - name: Build
         run: go build -o ./bin/infraseal ./cmd/infraseal
       - name: Run sample full scan
-        run: ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format json --format markdown --format html --format csv
+        run: |
+          ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format json --format markdown --format html --format csv --format pdf --include-tool-details
+          grep -q '"status": "fail"' samples/rag-support-agent/.infraseal/reports/latest-scan.json
       - name: Run sample readiness packs
         run: |
           ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance iso42001 --format json --format markdown
           ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance nist-ai-rmf --format json --format markdown
           ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance aiuc1 --format json --format markdown
+      - name: Run targeted pass/fail samples
+        run: |
+          ./bin/infraseal --config samples/tool-cases/promptfoo/pass/.infraseal/infraseal.yaml scan --check prompt-injection --target promptfooconfig.yaml --format json
+          grep -q '"status": "pass"' samples/tool-cases/promptfoo/pass/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/promptfoo/fail/.infraseal/infraseal.yaml scan --check prompt-injection --target promptfooconfig.yaml --format json
+          grep -q '"status": "fail"' samples/tool-cases/promptfoo/fail/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/hallbayes/pass/.infraseal/infraseal.yaml scan --check hallucination --target exports/chatbot-responses.jsonl --format json
+          grep -q '"status": "pass"' samples/tool-cases/hallbayes/pass/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/hallbayes/fail/.infraseal/infraseal.yaml scan --check hallucination --target exports/chatbot-responses.jsonl --format json
+          grep -q '"status": "fail"' samples/tool-cases/hallbayes/fail/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/terraform/pass/.infraseal/infraseal.yaml scan --check runtime-security --target infra/tfplan.json --format json
+          grep -q '"status": "pass"' samples/tool-cases/terraform/pass/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/terraform/fail/.infraseal/infraseal.yaml scan --check runtime-security --target infra/tfplan.json --format json
+          grep -q '"status": "fail"' samples/tool-cases/terraform/fail/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/go/pass/.infraseal/infraseal.yaml scan --check code-security --target app --format json
+          grep -q '"status": "pass"' samples/tool-cases/go/pass/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/go/fail/.infraseal/infraseal.yaml scan --check code-security --target app --format json
+          grep -q '"status": "fail"' samples/tool-cases/go/fail/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/govulncheck/pass/.infraseal/infraseal.yaml scan --check dependency-risk --target app --format json
+          grep -q '"status": "pass"' samples/tool-cases/govulncheck/pass/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/govulncheck/fail/.infraseal/infraseal.yaml scan --check dependency-risk --target app --format json
+          grep -q '"status": "fail"' samples/tool-cases/govulncheck/fail/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/agent/pass/.infraseal/infraseal.yaml scan --check agent-safety --target .infraseal/agent-skills --format json
+          grep -q '"status": "pass"' samples/tool-cases/agent/pass/.infraseal/reports/latest-scan.json
+          ./bin/infraseal --config samples/tool-cases/agent/fail/.infraseal/infraseal.yaml scan --check agent-safety --target .infraseal/agent-skills --format json
+          grep -q '"status": "fail"' samples/tool-cases/agent/fail/.infraseal/reports/latest-scan.json
+      - name: Validate targeted command shape
+        run: |
+          if ./bin/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan compliance iso42001; then
+            echo "scan accepted unexpected positional arguments"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v7
         if: always()
         with:

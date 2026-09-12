@@ -92,6 +92,7 @@ func (a *app) scanCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Run an MCPvia evaluation profile",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Minute)
 			defer cancel()
@@ -131,6 +132,7 @@ func (a *app) complianceFrameworkCommand(framework, short string) *cobra.Command
 	cmd := &cobra.Command{
 		Use:   framework,
 		Short: short,
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Minute)
 			defer cancel()
@@ -327,7 +329,7 @@ func printCompliance(out io.Writer, result schema.ComplianceResult, includeTools
 		fmt.Fprintf(out, "  %d. %s (%s)\n", item.Priority, item.Title, item.EstimatedEffort)
 	}
 	if includeTools {
-		printTools(out, result.ToolResults)
+		printComplianceEvidence(out, result.ToolResults)
 	}
 	printPaths(out, result.ReportPaths)
 	fmt.Fprintln(out, "\nOfficial resources:")
@@ -341,14 +343,26 @@ func printCompliance(out io.Writer, result schema.ComplianceResult, includeTools
 func printCoverage(out io.Writer, tools []schema.ToolResult) {
 	counts := map[string]int{}
 	for _, tool := range tools {
+		if tool.Status == scanners.StatusError {
+			counts["error"]++
+			continue
+		}
 		counts[tool.Mode]++
 	}
-	fmt.Fprintf(out, "\nEvaluation Coverage: MCPvia native active; %d real, %d mocked, %d missing, %d disabled, %d errors\n", counts["real"], counts["mocked"], counts["missing dependency"], counts["disabled"], counts["error"])
+	fmt.Fprintf(out, "\nEvaluation Coverage: MCPvia native active; %d real, %d native, %d missing, %d disabled, %d errors\n", counts["real"], counts["native"], counts["missing dependency"], counts["disabled"], counts["error"])
 	fmt.Fprintln(out, "  Use --include-tool-details to inspect evaluator-level provenance.")
 }
 
 func printTools(out io.Writer, tools []schema.ToolResult) {
 	fmt.Fprintln(out, "\nEvaluation Provenance")
+	for _, tool := range tools {
+		fmt.Fprintf(out, "  %-28s %-18s %-12s %s\n", tool.DisplayName, tool.Status, tool.Mode, oneLine(tool.Detail))
+	}
+}
+
+func printComplianceEvidence(out io.Writer, tools []schema.ToolResult) {
+	fmt.Fprintln(out, "\nReadiness Evidence Provenance")
+	fmt.Fprintln(out, "  This command did not execute scanner adapters; entries below were loaded from the latest technical scan.")
 	for _, tool := range tools {
 		fmt.Fprintf(out, "  %-28s %-18s %-12s %s\n", tool.DisplayName, tool.Status, tool.Mode, oneLine(tool.Detail))
 	}
@@ -443,12 +457,10 @@ func publicStatusDetail(status string) string {
 	switch status {
 	case scanners.StatusAvailable:
 		return "enhanced local coverage is ready"
-	case scanners.StatusMocked:
-		return "deterministic fixture-backed coverage is ready"
 	case scanners.StatusMissingDependency, "missing_backend_key":
 		return "optional enhanced coverage is not configured"
 	case scanners.StatusDisabled:
-		return "disabled by project configuration"
+		return "needs a compatible target or optional evaluator binding"
 	case scanners.StatusError:
 		return "availability check returned an error"
 	default:

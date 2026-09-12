@@ -45,7 +45,6 @@ settings:
   show_tool_details: false
   block_on_critical: true
   minimum_readiness_score: 80
-  allow_mocked_scanners: true
 governance:
   data_owner: support-data-owner
   approval_workflow: Security and data owner approve the full scan report before release.
@@ -87,14 +86,18 @@ infraseal scan --profile quick
 infraseal scan --profile rag --include-tool-details
 infraseal scan --profile full --fail-on-gate
 infraseal scan --check hallucination --target exports/chatbot-responses.jsonl
+infraseal scan --check prompt-injection --target prompts/
+infraseal scan --check pii --target exports/
+infraseal scan --check agent-safety --target agents/
 infraseal scan --check runtime-security --target infra/tfplan.json
+infraseal scan --check dependency-risk --target app/
 ```
 
 `--fail-on-gate` is intended for CI. Local scans report the decision without forcing a non-zero exit by default.
 
 ## `infraseal compliance iso42001`
 
-Runs the readiness pack and generates local reports. Use `--fail-on-readiness` for a CI gate against `minimum_readiness_score`.
+Runs the readiness pack and generates local reports. Compliance commands inspect governance evidence and the latest technical scan evidence; they do not execute scanner adapters. Use `--fail-on-readiness` for a CI gate against `minimum_readiness_score`.
 
 InfraSeal also includes:
 
@@ -111,7 +114,7 @@ Checks configuration, evidence, test cases, recommended governance inputs, evalu
 
 ## `infraseal scanners`
 
-Shows InfraSeal evaluation capabilities and whether enhanced, fixture-backed, or native coverage is ready. Backend implementation names and install commands are kept in `docs/scanner-integrations.md`.
+Shows InfraSeal evaluation capabilities and whether enhanced, native, missing, disabled, or errored coverage is present. Backend implementation names and install commands are kept in `docs/scanner-integrations.md`.
 
 ## `infraseal report`
 

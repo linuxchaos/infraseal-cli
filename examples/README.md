@@ -3,7 +3,7 @@
 Start with the bundled RAG support agent sample:
 
 ```bash
-go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format html --format csv
+go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format json --format markdown --format html --format csv --format pdf
 ```
 
 The sample is shaped like a small development team repository. It includes:

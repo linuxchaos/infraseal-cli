@@ -26,7 +26,7 @@ Governance and readiness checks:
 - AI policy, risk register, impact assessment, model card, and data lineage
 - Human oversight plan, approval workflow, monitoring cadence, and change-management rules
 - Incident response, vendor review, user disclosure, training records, audit log, and remediation tracking
-- Readiness views for ISO/IEC 42001, NIST AI RMF, and AIUC-1 principles
+- ISO/IEC 42001 Clause 4-10 readiness, plus separate NIST AI RMF and AIUC-1 views
 
 ## What It Does Not Do
 
@@ -57,6 +57,17 @@ Requirements:
 - Optional: Node.js and npm for enhanced AI workload scanning
 - Optional: Python 3.11+ for selected evaluator integrations
 - Optional: Terraform when you want to generate plan JSON before scanning
+
+Optional evaluator CLIs:
+
+```bash
+npm install -g promptfoo
+go install github.com/securego/gosec/v2/cmd/gosec@latest
+go install golang.org/x/vuln/cmd/govulncheck@latest
+python -m pip install git+https://github.com/NVIDIA/SkillSpector.git
+```
+
+InfraSeal does not require every optional tool before it can run. Missing evaluators are reported as unavailable and do not produce synthetic findings. Native checks, deterministic grounding checks, Terraform plan review, compliance readiness, and report generation still work locally.
 
 ### macOS
 
@@ -98,41 +109,51 @@ go build -o bin/infraseal.exe ./cmd/infraseal
 
 ## Try The Included Sample
 
-The repository includes a realistic sample workload at `samples/rag-support-agent/`. It contains prompts, exported chatbot responses, approved policy evidence, governance documents, a risky agent skill, Go code, and Terraform plan JSON.
+The repository includes a realistic sample workload at `samples/rag-support-agent/`. It contains prompts, exported chatbot responses, approved policy evidence, governance documents, an agent skill manifest, Go code, and Terraform plan JSON.
 
 Run:
 
 ```bash
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml doctor
-go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format html --format csv
+go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format json --format markdown --format html --format csv --format pdf
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance iso42001
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance nist-ai-rmf
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance aiuc1
 ```
+
+Additional pass/fail tool cases live under `samples/tool-cases/`. They are small by design and let you verify each scanner path against a clean input and an intentionally risky input.
 
 Example output:
 
 ```text
 InfraSeal AI Assurance
 
-Project: rag-support-agent
-Profile: full
-Decision: FAIL
-Trust Score: 0/100
+Project:      rag-support-agent
+Workload:     rag-agent
+Profile:      full
+Trust Score:  0/100
+Decision:     FAIL
 
 Findings:
-- critical runtime-security: Public inbound access allows 0.0.0.0/0
-- high grounding: Unsupported answer claim: 90-day unconditional refund
-- high prompt-injection: System prompt disclosure failure
-- high iam-policy: Wildcard IAM policy allows all actions or resources
-- medium code-security: File inclusion through variable path
+- critical Security: Data access without tenant filter - cross-tenant access risk
+- critical Code Security: Terraform plan exposes inbound access to the internet
+- high Grounding: unsupported 90-day refund claim
+- high Grounding: Unsupported production chatbot claim detected: 90-day unconditional refund
+- high Security: prompt injection disclosure
+- high Code Security: Terraform plan makes a database publicly accessible
+- high Governance: Terraform plan disables database storage encryption
+- high Security: Terraform plan contains a secret-like literal value
+- high Code Security: Terraform plan includes wildcard IAM policy access
+- medium Code Security: G304 Potential file inclusion via variable
 
 Reports:
 - .infraseal/reports/scan-<timestamp>.html
 - .infraseal/reports/scan-<timestamp>.csv
 - .infraseal/reports/scan-<timestamp>.json
+- .infraseal/reports/scan-<timestamp>.md
+- .infraseal/reports/scan-<timestamp>.pdf
 
-Evaluation Coverage: MCPvia native active; 6 real, 5 mocked, 0 missing, 0 disabled, 0 errors
+Evaluation Coverage: MCPvia native active; 6 real, 1 native, 3 missing, 1 disabled, 0 errors
 ```
 
 ## Use It In Your Own Repository
@@ -199,6 +220,7 @@ infraseal scan --check pii --target responses/
 infraseal scan --check prompt-injection --target prompts/
 infraseal scan --check agent-safety --target agents/
 infraseal scan --check code-security --target app/
+infraseal scan --check dependency-risk --target app/
 infraseal scan --check runtime-security --target infra/tfplan.json
 infraseal scan --profile full --target src/ --exclude vendor/** --format html --format csv
 ```
@@ -239,6 +261,10 @@ infraseal version
 
 InfraSeal works without cloud credentials. Optional backends can add deeper evaluation coverage when installed and configured. Backend names and setup steps are intentionally kept in [docs/scanner-integrations.md](docs/scanner-integrations.md) instead of primary scan output.
 
+## Taubyte Runtime
+
+The Taubyte runtime provider is scaffolded but not live. `--runtime taubyte` currently falls back to local execution when `runtime.fallback: local` is configured. The planned integration is a sandbox deployment flow that provisions an isolated Taubyte or cloud-native environment, runs the workload there, and returns scan evidence to InfraSeal. See [docs/taubyte-runtime.md](docs/taubyte-runtime.md).
+
 ## Documentation
 
 - [Installation](docs/installation.md)
@@ -247,6 +273,7 @@ InfraSeal works without cloud credentials. Optional backends can add deeper eval
 - [Compliance Benchmarks](docs/compliance-benchmarks.md)
 - [GitHub Actions](docs/github-actions.md)
 - [Scanner Integrations](docs/scanner-integrations.md)
+- [Taubyte Runtime](docs/taubyte-runtime.md)
 - [MCPvia](docs/mcpvia.md)
 
 ## Development
@@ -258,4 +285,4 @@ go run ./cmd/infraseal version
 
 ## License
 
-MIT
+This project is released under the MIT License. See [LICENSE](LICENSE).

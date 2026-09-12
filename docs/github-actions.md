@@ -51,7 +51,19 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "24"
+
+      - name: Install evaluator CLIs
+        run: |
+          npm install -g promptfoo@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Install optional agent analyzer
+        continue-on-error: true
+        run: |
+          python3 -m pip install --user git+https://github.com/NVIDIA/SkillSpector.git
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install InfraSeal
         run: go install github.com/linuxchaos/infraseal-cli/cmd/infraseal@latest
@@ -69,7 +81,7 @@ jobs:
         run: infraseal scan --profile full --fail-on-gate --format json --format markdown --format html --format csv
 
       - name: Run readiness gate
-        run: infraseal compliance nist-ai-rmf --fail-on-readiness --format json --format markdown
+        run: infraseal compliance iso42001 --fail-on-readiness --format json --format markdown
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -99,3 +111,9 @@ For infrastructure evidence only:
 `--fail-on-gate` returns a non-zero exit code when the scan decision is `fail`. `--fail-on-readiness` returns a non-zero exit code when the selected readiness pack is below the configured threshold or blocked by high-severity unresolved evidence.
 
 Reports are still uploaded with `if: always()`, so reviewers can inspect the findings even when the pull request check fails.
+
+## Notes On Coverage
+
+The workflow installs the common open-source evaluator CLIs that InfraSeal can orchestrate. If a repository does not contain matching inputs, a capability may still be disabled for that run. For example, source-security checks require `go.mod`, infrastructure checks require Terraform plan JSON, and prompt red-team checks require a Promptfoo configuration.
+
+Readiness commands do not launch scanner adapters. Run `infraseal scan` first, then run `infraseal compliance iso42001` so the readiness report can load the latest technical evidence.

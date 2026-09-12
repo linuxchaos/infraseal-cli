@@ -55,7 +55,6 @@ type SettingsConfig struct {
 	ShowToolDetails       bool `yaml:"show_tool_details"`
 	BlockOnCritical       bool `yaml:"block_on_critical"`
 	MinimumReadinessScore int  `yaml:"minimum_readiness_score"`
-	AllowMockedScanners   bool `yaml:"allow_mocked_scanners"`
 }
 
 type GovernanceConfig struct {
@@ -118,7 +117,7 @@ func Default(projectName string) Config {
 			TerraformPlanJSON: []string{"infra/tfplan.json", "infra/terraform-plan.json", ".infraseal/evidence/tfplan.json"},
 		},
 		Output:   OutputConfig{Formats: []string{"json", "markdown", "html", "csv"}},
-		Settings: SettingsConfig{BlockOnCritical: true, MinimumReadinessScore: 80, AllowMockedScanners: true},
+		Settings: SettingsConfig{BlockOnCritical: true, MinimumReadinessScore: 80},
 		Governance: GovernanceConfig{
 			ReevaluateOnChange:      true,
 			PolicyPath:              ".infraseal/governance/ai-policy.md",

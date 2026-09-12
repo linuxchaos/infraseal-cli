@@ -99,3 +99,67 @@ It does not install tools, upload source code, call a model provider, create an 
 8. Run `infraseal compliance nist-ai-rmf` or `infraseal compliance aiuc1` when those views are useful to the team.
 
 Optional backend integrations add depth. They are not required for MCPvia native checks or local reports. See `scanner-integrations.md` for those requirements.
+
+## Optional Evaluator Setup
+
+InfraSeal is useful without any optional evaluator CLI. A first run can still inspect configured test cases, exported chatbot responses, Terraform plan JSON, governance evidence, and native targeted patterns. Optional tools add deeper checks when the repository contains matching files.
+
+Common local setup:
+
+```bash
+npm install -g promptfoo
+go install github.com/securego/gosec/v2/cmd/gosec@latest
+go install golang.org/x/vuln/cmd/govulncheck@latest
+python -m pip install git+https://github.com/NVIDIA/SkillSpector.git
+```
+
+The `g0` evaluator is invoked through `npx`, so Node.js and npm are enough:
+
+```bash
+npx @guard0/g0 scan . --help
+```
+
+After installing optional tools:
+
+```bash
+infraseal doctor
+infraseal scanners
+infraseal scan --profile full --include-tool-details
+```
+
+Missing optional tools do not produce findings. They are reported as unavailable so the operator knows which coverage was not present.
+
+## Using InfraSeal Without The Sample YAML
+
+In a normal repository, do this from the repository root:
+
+```bash
+infraseal init
+```
+
+Then edit `.infraseal/infraseal.yaml` to point at the repository's real files. At minimum, set:
+
+- `project.name`, `project.type`, `project.purpose`, and `project.owner`
+- `inputs.include` for folders to scan
+- `inputs.exclude` for generated files, vendored code, reports, and large assets
+- `inputs.prompts` for prompt templates or system prompts
+- `inputs.evidence` for approved policy, knowledge, retrieval, or product evidence
+- `inputs.test_cases` for YAML evaluation cases
+- `inputs.agent_skills` for agent tools, manifests, or skill folders
+- `inputs.terraform_plan_json` for Terraform plan output when infrastructure should be reviewed
+- `output.formats` for `json`, `markdown`, `html`, `csv`, or `pdf`
+
+Relative paths resolve from the repository root when the config is at `.infraseal/infraseal.yaml`. If you keep the YAML elsewhere and pass `--config`, relative paths resolve from the directory containing that YAML.
+
+Run a focused check first:
+
+```bash
+infraseal scan --check hallucination --target exports/chatbot-responses.jsonl --format html --format csv
+```
+
+Then run the broader release check:
+
+```bash
+infraseal scan --profile full --format json --format markdown --format html --format csv
+infraseal compliance iso42001 --format markdown --format html
+```

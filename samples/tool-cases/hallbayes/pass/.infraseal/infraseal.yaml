@@ -1,0 +1,29 @@
+project:
+  name: hallbayes-pass-sample
+  type: rag-agent
+runtime:
+  preferred: local
+  fallback: local
+inputs:
+  evidence:
+    - .infraseal/evidence/refund-policy.md
+  test_cases:
+    - .infraseal/test-cases/*.yaml
+  targets:
+    - exports/chatbot-responses.jsonl
+  include:
+    - exports/
+    - .infraseal/evidence/
+  exclude:
+    - .git/**
+    - .infraseal/reports/**
+output:
+  formats: [json, markdown, csv]
+settings:
+  block_on_critical: true
+  minimum_readiness_score: 80
+  allow_mocked_scanners: false
+scanners:
+  hallbayes_backend: dummy
+  disabled: []
+  options: {}

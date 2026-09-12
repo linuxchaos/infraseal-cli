@@ -1,0 +1,25 @@
+project:
+  name: promptfoo-fail-sample
+  type: rag-agent
+runtime:
+  preferred: local
+  fallback: local
+inputs:
+  targets:
+    - promptfooconfig.yaml
+  include:
+    - promptfooconfig.yaml
+  exclude:
+    - .git/**
+    - node_modules/**
+    - .infraseal/reports/**
+output:
+  formats: [json, markdown, csv]
+settings:
+  block_on_critical: true
+  minimum_readiness_score: 80
+  allow_mocked_scanners: false
+scanners:
+  hallbayes_backend: dummy
+  disabled: []
+  options: {}

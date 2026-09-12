@@ -23,4 +23,4 @@ Capability provenance is available through:
 
 These surfaces do not expose backend vendor or project names. The separate `scanner-integrations.md` document is the explicit implementation reference for operators who need dependency setup or troubleshooting.
 
-Every adapter labels execution as real, mocked, missing dependency, disabled, or error. Mock output is allowed only when configured and backed by local test-case fixtures or the explicit grounding dummy backend.
+Every adapter labels execution as real, native, missing dependency, disabled, or error. Missing or disabled optional evaluators do not create findings. The local grounding workflow is labeled native because it reads configured evidence files and exported responses directly; it is deterministic, not a model-judged semantic verifier.

@@ -77,15 +77,15 @@ func AssessFramework(input Input, framework string) schema.ComplianceResult {
 		}
 	default:
 		categories = []schema.ReadinessCategory{
-			technical(input, &findings),
-			governance(input, &findings),
-			riskImpactManagement(input, &findings),
-			humanOversight(input, &findings),
-			operationalMonitoring(input, &findings),
-			evidenceReadiness(input, &findings),
-			transparencyTraining(input, &findings),
+			isoClause4(input, &findings),
+			isoClause5(input, &findings),
+			isoClause6(input, &findings),
+			isoClause7(input, &findings),
+			isoClause8(input, &findings),
+			isoClause9(input, &findings),
+			isoClause10(input, &findings),
 		}
-		weights = map[string]int{"Technical Controls": 20, "Governance": 20, "Risk & Impact Management": 15, "Human Oversight": 15, "Operational Monitoring": 15, "Evidence Readiness": 10, "Transparency & Training": 5}
+		weights = map[string]int{"Clause 4 - Context": 15, "Clause 5 - Leadership": 15, "Clause 6 - Planning": 15, "Clause 7 - Support": 10, "Clause 8 - Operation": 20, "Clause 9 - Performance Evaluation": 15, "Clause 10 - Improvement": 10}
 		references = []schema.ControlReference{
 			{Framework: "ISO/IEC 42001", Reference: "ISO/IEC 42001:2023", Topic: "Official standard page and purchasing access", URL: standardURL},
 			{Framework: "ISO/IEC 42001", Reference: "ISO 42001 explained", Topic: "Official overview of AI management system requirements", URL: explainerURL},
@@ -113,6 +113,262 @@ func AssessFramework(input Input, framework string) schema.ComplianceResult {
 		ReportPaths:   map[string]string{}, Disclaimer: disclaimer,
 		StartedAt: input.StartedAt, CompletedAt: time.Now().UTC(),
 	}
+}
+
+func isoClause4(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
+	score := 0
+	var strengths, gaps []string
+	if input.Config.Project.Name != "" {
+		score += 15
+		strengths = append(strengths, "AI system is identified")
+	} else {
+		gaps = append(gaps, "AI system name is missing")
+	}
+	if input.Config.Project.Purpose != "" {
+		score += 20
+		strengths = append(strengths, "System purpose and intended use are documented")
+	} else {
+		gaps = append(gaps, "System purpose and intended use are missing")
+		*findings = append(*findings, gap("high", "system-context", "ISO Clause 4 context is missing system purpose", "Document intended use, users, business objective, and operating boundaries."))
+	}
+	if input.Config.Project.Type != "" {
+		score += 10
+		strengths = append(strengths, "Workload type is declared")
+	} else {
+		gaps = append(gaps, "Workload type is not declared")
+	}
+	if len(input.Config.Inputs.Include) > 0 || len(input.Config.Inputs.Targets) > 0 {
+		score += 15
+		strengths = append(strengths, "Assessment scope is declared")
+	} else {
+		gaps = append(gaps, "Assessment scope is not declared")
+	}
+	if len(input.Config.Inputs.Exclude) > 0 {
+		score += 10
+		strengths = append(strengths, "Out-of-scope paths are documented")
+	} else {
+		gaps = append(gaps, "Exclusions are not documented")
+	}
+	addDoc(input, &score, &strengths, &gaps, findings, 20, "AI impact assessment", input.Config.Governance.ImpactAssessment, "impact-assessment", "high", "Document stakeholders, intended users, foreseeable misuse, harms, safeguards, and operating context.")
+	addDoc(input, &score, &strengths, &gaps, findings, 10, "Data lineage record", input.Config.Governance.DataLineage, "data-lineage", "medium", "Map data sources, retrieval inputs, logs, personal data, retention, and approved storage.")
+	return enrich(category("Clause 4 - Context", score, strengths, gaps),
+		"Checks whether the AI management system scope, use case, interested-party context, and operating boundaries are explicit enough to review.",
+		[]string{"System inventory entry", "Purpose and intended use", "Assessment scope", "Exclusions", "Impact assessment", "Data lineage"},
+		[]schema.ControlReference{{Framework: "ISO/IEC 42001", Reference: "Clause 4", Topic: "Context of the organization and AI management system scope", URL: standardURL}})
+}
+
+func isoClause5(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
+	score := 0
+	var strengths, gaps []string
+	if input.Config.Project.Owner != "" {
+		score += 25
+		strengths = append(strengths, "Accountable AI system owner is defined")
+	} else {
+		gaps = append(gaps, "Accountable AI system owner is missing")
+		*findings = append(*findings, gap("high", "ai-ownership", "ISO Clause 5 leadership evidence is missing an accountable owner", "Assign an owner with authority over AI risk acceptance and release decisions."))
+	}
+	if input.Config.Governance.DataOwner != "" {
+		score += 10
+		strengths = append(strengths, "Data owner is defined")
+	} else {
+		gaps = append(gaps, "Data owner is missing")
+	}
+	if input.Config.Governance.ApprovalWorkflow != "" {
+		score += 15
+		strengths = append(strengths, "Approval workflow is documented")
+	} else {
+		gaps = append(gaps, "Approval workflow is missing")
+	}
+	if input.Config.Governance.HumanReviewRequired {
+		score += 15
+		strengths = append(strengths, "Human review is required before release")
+	} else {
+		gaps = append(gaps, "Human review requirement is missing")
+		*findings = append(*findings, gap("high", "human-oversight", "ISO Clause 5 does not require human review", "Require accountable human review for production releases and high-impact agent actions."))
+	}
+	addDoc(input, &score, &strengths, &gaps, findings, 20, "AI policy", input.Config.Governance.PolicyPath, "ai-policy", "high", "Maintain an approved AI policy covering permitted use, prohibited use, data handling, security, releases, and exceptions.")
+	addDoc(input, &score, &strengths, &gaps, findings, 15, "Training and attestation records", input.Config.Governance.TrainingRecords, "training-attestation", "medium", "Track role-based AI policy training and reviewer attestation.")
+	return enrich(category("Clause 5 - Leadership", score, strengths, gaps),
+		"Checks accountability, policy, roles, review authority, and leadership-backed operating expectations.",
+		[]string{"Named AI owner", "Data owner", "AI policy", "Approval workflow", "Human review requirement", "Training or attestation evidence"},
+		[]schema.ControlReference{{Framework: "ISO/IEC 42001", Reference: "Clause 5", Topic: "Leadership, policy, roles, responsibilities, and authorities", URL: standardURL}})
+}
+
+func isoClause6(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
+	score := 0
+	var strengths, gaps []string
+	addDoc(input, &score, &strengths, &gaps, findings, 25, "AI risk register", input.Config.Governance.RiskRegister, "risk-register", "high", "Maintain a risk register with owner, likelihood, impact, treatment, due date, status, and residual risk.")
+	addDoc(input, &score, &strengths, &gaps, findings, 20, "AI impact assessment", input.Config.Governance.ImpactAssessment, "impact-assessment", "high", "Document foreseeable misuse, harms, affected stakeholders, safeguards, and go/no-go decision.")
+	if input.Config.Settings.MinimumReadinessScore > 0 {
+		score += 15
+		strengths = append(strengths, "Readiness threshold is configured")
+	} else {
+		gaps = append(gaps, "Readiness threshold is not configured")
+	}
+	if input.Config.Settings.BlockOnCritical {
+		score += 15
+		strengths = append(strengths, "Critical findings block release")
+	} else {
+		gaps = append(gaps, "Critical findings are not configured to block release")
+	}
+	if input.Config.Governance.RemediationTracking != "" {
+		score += 15
+		strengths = append(strengths, "Risk treatment and remediation tracking are documented")
+	} else {
+		gaps = append(gaps, "Risk treatment tracking is missing")
+	}
+	if input.Config.Governance.ReevaluateOnChange {
+		score += 10
+		strengths = append(strengths, "Material changes require re-evaluation")
+	} else {
+		gaps = append(gaps, "Change-triggered re-evaluation is missing")
+	}
+	return enrich(category("Clause 6 - Planning", score, strengths, gaps),
+		"Checks planning evidence for AI risks, objectives, treatment decisions, release gates, and change-triggered reassessment.",
+		[]string{"Risk register", "Impact assessment", "Risk treatment process", "Release threshold", "Critical-finding gate", "Re-evaluation trigger"},
+		[]schema.ControlReference{{Framework: "ISO/IEC 42001", Reference: "Clause 6", Topic: "Planning for risks, opportunities, AI objectives, and changes", URL: standardURL}})
+}
+
+func isoClause7(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
+	score := 0
+	var strengths, gaps []string
+	if len(input.Evidence) > 0 {
+		score += 20
+		strengths = append(strengths, fmt.Sprintf("%d evidence source(s) are traceable", len(input.Evidence)))
+	} else {
+		gaps = append(gaps, "Evidence source files are missing")
+		*findings = append(*findings, gap("high", "documented-information", "ISO Clause 7 evidence sources are missing", "Version the approved policy, knowledge, evaluation, or operational evidence used by the AI system."))
+	}
+	if len(input.TestSources) > 0 {
+		score += 15
+		strengths = append(strengths, "Evaluation cases are traceable to files")
+	} else {
+		gaps = append(gaps, "Evaluation case files are missing")
+	}
+	addDoc(input, &score, &strengths, &gaps, findings, 20, "Model card", input.Config.Governance.ModelCard, "model-card", "medium", "Document model/provider, version, intended use, limitations, evaluation summary, failure modes, and monitoring triggers.")
+	addDoc(input, &score, &strengths, &gaps, findings, 15, "Data lineage record", input.Config.Governance.DataLineage, "data-lineage", "medium", "Document prompts, retrieval sources, logs, personal data, retention, storage, and access owners.")
+	addDoc(input, &score, &strengths, &gaps, findings, 10, "Vendor review", input.Config.Governance.VendorReview, "vendor-review", "medium", "Record provider dependencies, data sharing, retention terms, security review, contractual controls, and exit criteria.")
+	addDoc(input, &score, &strengths, &gaps, findings, 10, "Training and attestation records", input.Config.Governance.TrainingRecords, "training-attestation", "medium", "Track role-based AI training, security training, policy attestations, reviewers, and exceptions.")
+	if len(input.Config.Output.Formats) > 0 {
+		score += 10
+		strengths = append(strengths, "Report formats are configured for evidence retention")
+	}
+	return enrich(category("Clause 7 - Support", score, strengths, gaps),
+		"Checks support evidence for documented information, resources, competence, awareness, model context, and supplier dependencies.",
+		[]string{"Evidence files", "Evaluation cases", "Model card", "Data lineage", "Vendor review", "Training records", "Report retention format"},
+		[]schema.ControlReference{{Framework: "ISO/IEC 42001", Reference: "Clause 7", Topic: "Support, resources, competence, awareness, communication, and documented information", URL: standardURL}})
+}
+
+func isoClause8(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
+	score := 0
+	var strengths, gaps []string
+	if len(input.Config.Inputs.Prompts) > 0 {
+		score += 10
+		strengths = append(strengths, "Prompt inputs are configured")
+	} else {
+		gaps = append(gaps, "Prompt inputs are not configured")
+	}
+	if len(input.TestCases) > 0 {
+		score += 15
+		strengths = append(strengths, "Operational evaluation cases are configured")
+	} else {
+		gaps = append(gaps, "Operational evaluation cases are missing")
+	}
+	for _, item := range []struct {
+		category string
+		points   int
+		label    string
+	}{
+		{"prompt-injection", 10, "Prompt-injection validation is configured"},
+		{"grounding", 10, "Grounding validation is configured"},
+		{"pii", 10, "Privacy validation is configured"},
+		{"output-safety", 10, "Unsafe-output validation is configured"},
+		{"agent-safety", 10, "Agent safety validation is configured"},
+	} {
+		if hasAnyCategory(input.TestCases, item.category) {
+			score += item.points
+			strengths = append(strengths, item.label)
+		} else {
+			gaps = append(gaps, item.label+" missing")
+		}
+	}
+	if len(input.Config.Inputs.TerraformPlanJSON) > 0 {
+		score += 10
+		strengths = append(strengths, "Runtime infrastructure plan evidence is configured")
+	} else {
+		gaps = append(gaps, "Runtime infrastructure plan evidence is not configured")
+	}
+	if !hasHighRiskFinding(input.ToolResults, "prompt-injection", "pii", "privacy", "credential", "output-safety", "grounding", "hallucination", "agent-safety", "runtime-security", "code-security", "dependency", "iam-policy") {
+		score += 15
+		strengths = append(strengths, "No high or critical operational findings are present in latest scan evidence")
+	} else {
+		gaps = append(gaps, "High or critical operational findings are present in latest scan evidence")
+		*findings = append(*findings, gap("high", "technical-risk", "ISO Clause 8 operational controls have unresolved technical findings", "Close high and critical findings or record accountable risk acceptance before release."))
+	}
+	return enrich(category("Clause 8 - Operation", score, strengths, gaps),
+		"Checks whether operational AI controls are configured and whether latest scan evidence shows unresolved high-risk behavior.",
+		[]string{"Prompt inputs", "Evaluation test cases", "Agent skill scope", "Terraform plan evidence", "Latest technical scan report", "Release blocking findings"},
+		[]schema.ControlReference{{Framework: "ISO/IEC 42001", Reference: "Clause 8", Topic: "Operational planning and control for AI systems", URL: standardURL}})
+}
+
+func isoClause9(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
+	score := 0
+	var strengths, gaps []string
+	if len(input.ToolResults) > 0 {
+		score += 25
+		strengths = append(strengths, "Latest scan evidence is available for performance review")
+	} else {
+		gaps = append(gaps, "No latest scan evidence was found; run `infraseal scan` before final readiness review")
+	}
+	addDoc(input, &score, &strengths, &gaps, findings, 25, "Monitoring plan", input.Config.Governance.MonitoringPlan, "monitoring-plan", "medium", "Define metrics, sampling, alert thresholds, owner, monitoring cadence, and evidence retention.")
+	if input.Config.Governance.EvaluationCadence != "" {
+		score += 15
+		strengths = append(strengths, "Evaluation cadence is defined")
+	} else {
+		gaps = append(gaps, "Evaluation cadence is not defined")
+	}
+	addDoc(input, &score, &strengths, &gaps, findings, 15, "Decision audit log", input.Config.Governance.AuditLog, "decision-trail", "medium", "Record release decisions, scan reports, approvers, exceptions, incidents, and risk acceptance decisions.")
+	if !hasHighRiskFinding(input.ToolResults, "prompt-injection", "pii", "privacy", "credential", "output-safety", "grounding", "hallucination", "agent-safety", "runtime-security", "code-security", "dependency", "iam-policy") {
+		score += 20
+		strengths = append(strengths, "Latest scan evidence has no high or critical measurement findings")
+	} else {
+		gaps = append(gaps, "Latest scan evidence contains high or critical measurement findings")
+		*findings = append(*findings, gap("high", "performance-evaluation", "ISO Clause 9 performance review found unresolved high-risk findings", "Review scan evidence, assign owners, and rerun focused checks after remediation."))
+	}
+	return enrich(category("Clause 9 - Performance Evaluation", score, strengths, gaps),
+		"Checks monitoring, measurement, analysis, review evidence, and whether recent scan findings are suitable for release review.",
+		[]string{"Latest scan report", "Monitoring plan", "Evaluation cadence", "Audit log", "Measurement findings", "Review evidence"},
+		[]schema.ControlReference{{Framework: "ISO/IEC 42001", Reference: "Clause 9", Topic: "Performance evaluation, monitoring, measurement, analysis, internal review, and management review", URL: standardURL}})
+}
+
+func isoClause10(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
+	score := 0
+	var strengths, gaps []string
+	addDoc(input, &score, &strengths, &gaps, findings, 20, "Change-management plan", input.Config.Governance.ChangeManagement, "change-management", "medium", "Define changes that require re-evaluation, reviewer approval, and release evidence.")
+	addDoc(input, &score, &strengths, &gaps, findings, 20, "AI incident response runbook", input.Config.Governance.IncidentResponseRunbook, "incident-response", "medium", "Document triage, containment, evidence preservation, notification, remediation, re-approval, and post-incident review.")
+	if input.Config.Governance.RemediationTracking != "" {
+		score += 20
+		strengths = append(strengths, "Corrective-action tracking is documented")
+	} else {
+		gaps = append(gaps, "Corrective-action tracking is missing")
+	}
+	if input.Config.Governance.ReevaluateOnChange {
+		score += 15
+		strengths = append(strengths, "Material changes require re-evaluation")
+	} else {
+		gaps = append(gaps, "Material changes do not require re-evaluation")
+	}
+	addDoc(input, &score, &strengths, &gaps, findings, 15, "Decision audit log", input.Config.Governance.AuditLog, "decision-trail", "medium", "Maintain release decisions, exceptions, incidents, corrective actions, and closure evidence.")
+	if !hasCriticalFinding(input.ToolResults) {
+		score += 10
+		strengths = append(strengths, "No critical findings are present in latest scan evidence")
+	} else {
+		gaps = append(gaps, "Critical findings remain open in latest scan evidence")
+	}
+	return enrich(category("Clause 10 - Improvement", score, strengths, gaps),
+		"Checks whether nonconformities, incidents, corrective actions, changes, and continual improvement are tracked in an actionable way.",
+		[]string{"Change-management plan", "Incident response runbook", "Corrective-action tracker", "Re-evaluation trigger", "Audit log", "Closure evidence"},
+		[]schema.ControlReference{{Framework: "ISO/IEC 42001", Reference: "Clause 10", Topic: "Improvement, nonconformity, corrective action, and continual improvement", URL: standardURL}})
 }
 
 func technical(input Input, findings *[]schema.Finding) schema.ReadinessCategory {
@@ -407,7 +663,114 @@ func documentStatus(input Input, path string) (string, bool, string) {
 	if len(text) < 120 || strings.Contains(lower, "todo:") || strings.Contains(lower, "tbd") || strings.Contains(lower, "replace this") {
 		return rel, false, "a starter template or incomplete"
 	}
+	if missing := missingDocumentEvidence(rel, lower); len(missing) > 0 {
+		return rel, false, "missing expected content: " + strings.Join(missing, ", ")
+	}
 	return rel, true, ""
+}
+
+func missingDocumentEvidence(path, text string) []string {
+	type requirement struct {
+		label    string
+		keywords []string
+	}
+	requirementsByFile := map[string][]requirement{
+		"ai-policy.md": {
+			{"approved or permitted use", []string{"approved", "permitted", "acceptable"}},
+			{"prohibited use", []string{"prohibited", "must not", "decline", "refuse"}},
+			{"data handling", []string{"data", "privacy", "personal", "sensitive"}},
+			{"release criteria", []string{"release", "approval", "exception"}},
+		},
+		"risk-register.md": {
+			{"risk", []string{"risk"}},
+			{"owner", []string{"owner"}},
+			{"severity", []string{"severity", "impact", "likelihood"}},
+			{"treatment", []string{"treatment", "mitigation", "control"}},
+			{"status", []string{"status", "open", "closed", "accepted"}},
+		},
+		"impact-assessment.md": {
+			{"stakeholders", []string{"stakeholder", "customer", "user"}},
+			{"misuse or harms", []string{"misuse", "harm", "unsafe"}},
+			{"safeguards", []string{"safeguard", "control", "mitigation"}},
+			{"decision boundary", []string{"decision", "approved", "not approved", "must not"}},
+		},
+		"model-card.md": {
+			{"model identity", []string{"model", "provider", "version"}},
+			{"intended use", []string{"intended", "approved", "use"}},
+			{"limitations", []string{"limitation", "known", "failure"}},
+			{"evaluation", []string{"evaluation", "test", "monitoring"}},
+		},
+		"data-lineage.md": {
+			{"data sources", []string{"prompt", "retrieval", "source", "logs"}},
+			{"personal or sensitive data", []string{"personal", "sensitive", "customer"}},
+			{"retention or storage", []string{"retention", "storage", "stored"}},
+			{"access ownership", []string{"access", "owner", "approved"}},
+		},
+		"human-oversight-plan.md": {
+			{"review", []string{"review", "reviewer"}},
+			{"approval", []string{"approval", "approve"}},
+			{"escalation", []string{"escalation", "escalate"}},
+			{"exception or blocked action", []string{"exception", "blocked", "must not"}},
+		},
+		"monitoring-plan.md": {
+			{"metrics", []string{"metric", "rate", "threshold"}},
+			{"cadence", []string{"weekly", "daily", "cadence", "recurring"}},
+			{"owner or issue tracking", []string{"owner", "issue", "reviewer"}},
+			{"evidence retention", []string{"evidence", "report", "retention"}},
+		},
+		"change-management.md": {
+			{"change triggers", []string{"prompt", "model", "dependency", "terraform", "infrastructure"}},
+			{"re-evaluation", []string{"re-evaluation", "reevaluation", "reassess"}},
+			{"approval", []string{"approval", "reviewer", "release"}},
+		},
+		"incident-response.md": {
+			{"triage", []string{"triage", "first responder", "investigation"}},
+			{"containment", []string{"containment", "disable", "rollback", "revoke"}},
+			{"evidence preservation", []string{"evidence", "preserve", "logs"}},
+			{"remediation", []string{"remediation", "root-cause", "re-approval"}},
+		},
+		"vendor-review.md": {
+			{"provider dependency", []string{"provider", "vendor"}},
+			{"data sharing", []string{"data", "sharing", "retention"}},
+			{"security review", []string{"security", "contract", "terms"}},
+			{"exit criteria", []string{"exit", "criteria", "termination"}},
+		},
+		"training-records.md": {
+			{"training", []string{"training"}},
+			{"attestation", []string{"attestation", "acknowledge"}},
+			{"roles", []string{"role", "reviewer", "engineer", "owner"}},
+			{"policy", []string{"policy"}},
+		},
+		"user-disclosure.md": {
+			{"AI disclosure", []string{"disclosure", "interacting", "ai"}},
+			{"limitations", []string{"limitation", "imperfect", "not final"}},
+			{"escalation", []string{"escalation", "escalate", "support"}},
+			{"redress or appeal", []string{"redress", "appeal", "review"}},
+		},
+		"audit-log.md": {
+			{"decision", []string{"decision"}},
+			{"approval or exception", []string{"approval", "exception", "accepted"}},
+			{"report evidence", []string{"report", "evidence", "scan"}},
+			{"incident or change", []string{"incident", "change", "release"}},
+		},
+	}
+	items := requirementsByFile[strings.ToLower(filepath.Base(path))]
+	var missing []string
+	for _, item := range items {
+		if !containsAny(text, item.keywords...) {
+			missing = append(missing, item.label)
+		}
+	}
+	return missing
+}
+
+func containsAny(text string, values ...string) bool {
+	for _, value := range values {
+		if strings.Contains(text, strings.ToLower(value)) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasCategory(cases []config.TestCase, value string) bool {
@@ -926,6 +1289,17 @@ func hasHighRiskFinding(results []schema.ToolResult, categories ...string) bool 
 				if strings.Contains(value, strings.ToLower(category)) {
 					return true
 				}
+			}
+		}
+	}
+	return false
+}
+
+func hasCriticalFinding(results []schema.ToolResult) bool {
+	for _, result := range results {
+		for _, finding := range result.Findings {
+			if strings.EqualFold(finding.Severity, "critical") {
+				return true
 			}
 		}
 	}

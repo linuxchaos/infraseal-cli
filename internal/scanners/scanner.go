@@ -19,7 +19,6 @@ import (
 const (
 	StatusAvailable         = "available"
 	StatusMissingDependency = "missing_dependency"
-	StatusMocked            = "mocked"
 	StatusDisabled          = "disabled"
 	StatusError             = "error"
 )
@@ -141,11 +140,14 @@ func PublicName(name string) string {
 }
 
 func PublicDetail(status, mode string) string {
+	if status == StatusError {
+		return "The evaluator returned an execution error; review local diagnostic artifacts."
+	}
 	switch mode {
 	case "real":
 		return "The configured evaluator ran against the selected workload inputs."
-	case "mocked":
-		return "A declared local fixture or deterministic offline backend was used."
+	case "native":
+		return "A deterministic InfraSeal local check ran against repository evidence."
 	case "missing dependency":
 		return "Optional enhanced coverage is unavailable; MCPvia native checks still run."
 	case "disabled":

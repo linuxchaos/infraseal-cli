@@ -34,13 +34,7 @@ func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolRes
 	started := time.Now().UTC()
 	status := s.IsAvailable(ctx, input.Config)
 	if status.Status != scanners.StatusAvailable {
-		mode := "missing dependency"
-		if status.Status == scanners.StatusMissingDependency && input.Config.Settings.AllowMockedScanners {
-			mode = "mocked"
-			status.Status = scanners.StatusMocked
-		}
-		findings := scanners.FixtureFindings(input, categories(), s.Name(), mode)
-		result := scanners.NewResult(s, status.Status, mode, status.Detail, findings, started)
+		result := scanners.NewResult(s, status.Status, "missing dependency", status.Detail, nil, started)
 		result.RawPath = scanners.WriteJSONArtifact(input, s.Name(), result)
 		return result, nil
 	}

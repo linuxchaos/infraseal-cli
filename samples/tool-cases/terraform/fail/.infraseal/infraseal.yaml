@@ -1,0 +1,26 @@
+project:
+  name: terraform-fail-sample
+  type: ai-platform
+runtime:
+  preferred: local
+  fallback: local
+inputs:
+  targets:
+    - infra/tfplan.json
+  include:
+    - infra/
+  exclude:
+    - .git/**
+    - .infraseal/reports/**
+  terraform_plan_json:
+    - infra/tfplan.json
+output:
+  formats: [json, markdown, csv]
+settings:
+  block_on_critical: true
+  minimum_readiness_score: 80
+  allow_mocked_scanners: false
+scanners:
+  hallbayes_backend: dummy
+  disabled: []
+  options: {}

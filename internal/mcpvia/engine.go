@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -118,6 +118,7 @@ func (e *Orchestrator) runScan(ctx context.Context, request schema.ScanRequest, 
 	findings = append(findings, nativeTargetFindings(input.root, targets, nativeTargetChecks(request.Profile, checks), excludes)...)
 	for toolIndex := range toolResults {
 		toolResults[toolIndex].Findings = filterFindings(input.root, toolResults[toolIndex].Findings, excludes)
+		toolResults[toolIndex].Findings = filterFindingsForChecks(toolResults[toolIndex].Findings, checks)
 		for _, finding := range toolResults[toolIndex].Findings {
 			finding.HiddenByDefault = true
 			findings = append(findings, finding)
@@ -166,44 +167,14 @@ func (e *Orchestrator) RunCompliancePack(ctx context.Context, request schema.Com
 	if err != nil {
 		return nil, err
 	}
-	providerName := request.Runtime
-	if providerName == "" {
-		providerName = input.cfg.Runtime.Preferred
+	runtimeLabel := strings.TrimSpace(request.Runtime)
+	if runtimeLabel == "" {
+		runtimeLabel = "local evidence"
 	}
-	provider, fellBack := e.Runtimes.Resolve(ctx, providerName, input.cfg.Runtime.Fallback)
-	if provider == nil {
-		return nil, errors.New("no evaluation runtime is available")
-	}
-	if fellBack {
-		providerName = provider.Name() + " (fallback from " + providerName + ")"
-	} else {
-		providerName = provider.Name()
-	}
-
-	excludes := input.cfg.Inputs.Exclude
-	targetPatterns := input.cfg.Inputs.Include
-	if len(targetPatterns) == 0 {
-		targetPatterns = input.cfg.Inputs.Targets
-	}
-	targets := existing(config.ExpandWithExcludes(input.root, targetPatterns, excludes))
-
-	selected := e.adaptersFor(ctx, input.cfg, "full", nil)
 	assessmentID := newID(framework)
-	artifactDir := filepath.Join(input.root, ".infraseal", "reports", "artifacts", assessmentID)
-	toolResults, err := provider.Execute(ctx, selected, scanners.Input{
-		RootDir: input.root, ConfigPath: request.ConfigPath, Config: input.cfg, Profile: "governance",
-		ArtifactsDir: artifactDir, Evidence: input.evidence, TestCases: input.cases,
-		TestSources: input.testSources, AgentSkills: input.agentSkills,
-		Targets: targets, Excludes: excludes,
-	})
-	if err != nil {
-		return nil, err
-	}
-	for index := range toolResults {
-		toolResults[index].Findings = filterFindings(input.root, toolResults[index].Findings, excludes)
-	}
+	toolResults := latestScanEvidence(input.root)
 	result := iso42001.AssessFramework(iso42001.Input{
-		AssessmentID: assessmentID, RootDir: input.root, Runtime: providerName, Config: input.cfg,
+		AssessmentID: assessmentID, RootDir: input.root, Runtime: runtimeLabel, Config: input.cfg,
 		TestCases: input.cases, TestSources: input.testSources, Evidence: input.evidence, ToolResults: toolResults, StartedAt: started,
 	}, framework)
 	if e.Reports != nil {
@@ -214,6 +185,29 @@ func (e *Orchestrator) RunCompliancePack(ctx context.Context, request schema.Com
 		result.ReportPaths = paths
 	}
 	return &result, nil
+}
+
+func latestScanEvidence(root string) []schema.ToolResult {
+	data, err := os.ReadFile(filepath.Join(root, ".infraseal", "reports", "latest-scan.json"))
+	if err != nil {
+		data, err = os.ReadFile(filepath.Join(root, ".infraseal", "reports", "latest.json"))
+		if err != nil {
+			return nil
+		}
+	}
+	var stored schema.StoredResult
+	if err := json.Unmarshal(data, &stored); err != nil || stored.Kind != "scan" || stored.Scan == nil {
+		return nil
+	}
+	results := append([]schema.ToolResult{}, stored.Scan.ToolResults...)
+	if len(stored.Scan.Findings) > 0 {
+		results = append(results, schema.ToolResult{
+			Name: "latest-infraseal-scan", DisplayName: "Latest InfraSeal Scan",
+			Status: scanners.StatusAvailable, Mode: "native", Detail: "Findings loaded from the latest local scan report.",
+			Findings: stored.Scan.Findings, StartedAt: stored.Scan.StartedAt, CompletedAt: stored.Scan.CompletedAt,
+		})
+	}
+	return results
 }
 
 func (e *Orchestrator) ScannerStatuses(ctx context.Context, cfg config.Config) []schema.ScannerStatus {
@@ -480,6 +474,19 @@ func filterFindings(root string, findings []schema.Finding, excludes []string) [
 	return filtered
 }
 
+func filterFindingsForChecks(findings []schema.Finding, checks []string) []schema.Finding {
+	if len(checks) == 0 {
+		return findings
+	}
+	var filtered []schema.Finding
+	for _, finding := range findings {
+		if categoriesMatch([]string{finding.Category, finding.Domain, finding.Title}, checks) {
+			filtered = append(filtered, finding)
+		}
+	}
+	return filtered
+}
+
 func outputFormats(configured, requested []string) []string {
 	if len(requested) > 0 {
 		return requested
@@ -516,8 +523,10 @@ func nativeTargetChecks(profile string, checks []string) []string {
 		return checks
 	}
 	switch profile {
-	case "quick", "full":
+	case "quick":
 		return []string{"prompt-injection", "pii", "output-safety"}
+	case "full":
+		return []string{"prompt-injection", "pii", "output-safety", "agent-safety"}
 	case "agent":
 		return []string{"prompt-injection", "pii", "output-safety", "agent-safety"}
 	default:

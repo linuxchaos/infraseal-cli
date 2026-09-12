@@ -1,0 +1,10 @@
+name: grounded refund answer
+category: grounding
+description: The answer must match the approved refund policy.
+input: What is the refund policy?
+expected_behavior: State the conditional 14-day review policy.
+actual_output: Refund requests are reviewed within 14 days and depend on account eligibility.
+evidence_file: .infraseal/evidence/refund-policy.md
+unsupported_claim: 90-day unconditional refund
+pass: true
+severity: high

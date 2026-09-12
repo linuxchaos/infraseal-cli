@@ -74,17 +74,21 @@ Useful operating steps:
 - Preserve report artifacts for release review and later incident investigation.
 - Use pull request gates for high-risk workloads so technical findings are reviewed before merge.
 
-## Benchmark Views
+## ISO/IEC 42001 Readiness
 
-ISO/IEC 42001:
+InfraSeal focuses ISO/IEC 42001 first because it is the dedicated AI management system standard. The CLI maps repository evidence to Clause 4 through Clause 10 at a readiness level. It does not reproduce the licensed standard text and does not claim certification.
 
-- Technical Controls
-- Governance
-- Risk & Impact Management
-- Human Oversight
-- Operational Monitoring
-- Evidence Readiness
-- Transparency & Training
+Clause-oriented checks:
+
+- Clause 4 - Context: project identity, system purpose, workload type, scan scope, exclusions, impact assessment, and data lineage.
+- Clause 5 - Leadership: accountable owner, data owner, AI policy, approval workflow, human review, roles, and training/attestation evidence.
+- Clause 6 - Planning: risk register, impact assessment, readiness threshold, critical-finding gate, risk treatment, remediation tracking, and reassessment on material change.
+- Clause 7 - Support: traceable evidence sources, evaluation cases, model card, data lineage, vendor review, training records, and report retention formats.
+- Clause 8 - Operation: prompt inputs, operational test cases, prompt-injection, privacy, unsafe-output, grounding, agent-safety, runtime-plan evidence, and open high-risk technical findings.
+- Clause 9 - Performance Evaluation: latest scan evidence, monitoring plan, evaluation cadence, audit log, measurement results, and unresolved high-risk measurement findings.
+- Clause 10 - Improvement: change-management plan, incident response runbook, corrective-action tracking, re-evaluation triggers, audit log, closure evidence, and open critical findings.
+
+The content checks look for evidence quality signals inside the configured files, such as owners, treatment decisions, safeguards, review cadence, evidence retention, escalation routes, provider/data-sharing notes, and exception handling. A file with only a matching name or a starter `TODO` template does not pass.
 
 NIST AI RMF:
 
@@ -101,6 +105,10 @@ AIUC-1 principles:
 - Reliability
 - Accountability
 - Society
+
+## Future Semantic Review
+
+The current CLI uses deterministic document-quality checks and latest technical findings. A future local-LLM mode can add semantic extraction over governance documents to judge whether the evidence substantively satisfies each control objective. That mode should remain local or customer-controlled and should preserve excerpts, model settings, and decision traces for audit review.
 
 ## Commands
 
