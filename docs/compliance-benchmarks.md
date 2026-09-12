@@ -90,6 +90,14 @@ Clause-oriented checks:
 
 The content checks look for evidence quality signals inside the configured files, such as owners, treatment decisions, safeguards, review cadence, evidence retention, escalation routes, provider/data-sharing notes, and exception handling. A file with only a matching name or a starter `TODO` template does not pass.
 
+ISO reports also include per-clause control assessments with:
+
+- Applicability: applicable, conditional, or not applicable for the scanned workload.
+- Status: pass, needs evidence, needs remediation, or not applicable.
+- Review method: configuration check, document content check, test-case inventory, latest technical scan, or manual review.
+- Evidence checked: YAML fields, governance documents, test cases, latest scan reports, agent skill files, or Terraform plan JSON.
+- Gaps and next steps: concrete repository evidence, ownership, approval, monitoring, remediation, or operating records to add.
+
 NIST AI RMF:
 
 - GOVERN: ownership, policy, oversight, training, decision logs
@@ -106,9 +114,11 @@ AIUC-1 principles:
 - Accountability
 - Society
 
-## Future Semantic Review
+## Future Questionnaire And Semantic Review
 
-The current CLI uses deterministic document-quality checks and latest technical findings. A future local-LLM mode can add semantic extraction over governance documents to judge whether the evidence substantively satisfies each control objective. That mode should remain local or customer-controlled and should preserve excerpts, model settings, and decision traces for audit review.
+The current CLI uses deterministic document-quality checks and latest technical findings. A future workflow will add a step-by-step questionnaire for controls that cannot be proven from files alone, such as management accountability, training completion, vendor-contract enforcement, internal audits, exception approvals, and incident exercises.
+
+A future local-LLM mode can add semantic extraction over governance documents to judge whether the evidence substantively satisfies each control objective. That mode should remain local or customer-controlled and should preserve excerpts, prompts, model settings, reviewer identity, and decision traces for audit review.
 
 ## Commands
 

@@ -278,6 +278,13 @@ func complianceMarkdown(result schema.ComplianceResult, includeTools bool) strin
 		for _, strength := range category.Strengths {
 			fmt.Fprintf(&b, "- Strength: %s\n", strength)
 		}
+		if len(category.Controls) > 0 {
+			b.WriteString("\n**Control assessment**\n\n")
+			b.WriteString("| Control | Applicability | Status | Review method | Evidence checked | Gaps / next steps |\n|---|---|---|---|---|---|\n")
+			for _, control := range category.Controls {
+				fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s |\n", cell(control.Name), cell(control.Applicability), cell(control.Status), cell(control.ReviewMethod), cell(strings.Join(control.Evidence, "; ")), cell(controlGapsAndSteps(control)))
+			}
+		}
 		b.WriteString("\n**Expected evidence**\n\n")
 		for _, evidence := range category.ExpectedEvidence {
 			fmt.Fprintf(&b, "- %s\n", evidence)
@@ -436,6 +443,13 @@ func referenceLabel(ref schema.ControlReference) string {
 	return label
 }
 
+func controlGapsAndSteps(control schema.ControlAssessment) string {
+	var values []string
+	values = append(values, control.Gaps...)
+	values = append(values, control.NextSteps...)
+	return strings.Join(values, "; ")
+}
+
 func scanLines(result schema.ScanResult, includeTools bool) []string {
 	lines := []string{"InfraSeal AI Assurance Report", "Project: " + result.ProjectName, fmt.Sprintf("Trust score: %d/100", result.OverallScore), "Decision: " + strings.ToUpper(result.Status), "Profile: " + result.Profile, "Runtime: " + result.Runtime, "", "Domains:"}
 	for _, domain := range result.Domains {
@@ -468,6 +482,18 @@ func complianceLines(result schema.ComplianceResult, includeTools bool) []string
 		lines = append(lines, "  Assessment: "+category.AssessmentSummary)
 		for _, gap := range category.Gaps {
 			lines = append(lines, "  Gap: "+gap)
+		}
+		for _, control := range category.Controls {
+			lines = append(lines, fmt.Sprintf("  Control: %s [%s, %s]", control.Name, control.Applicability, control.Status))
+			if control.Summary != "" {
+				lines = append(lines, "    "+control.Summary)
+			}
+			if len(control.Evidence) > 0 {
+				lines = append(lines, "    Evidence: "+strings.Join(control.Evidence, "; "))
+			}
+			if text := controlGapsAndSteps(control); text != "" {
+				lines = append(lines, "    Gaps/next: "+text)
+			}
 		}
 		for _, evidence := range category.ExpectedEvidence {
 			lines = append(lines, "  Expected evidence: "+evidence)

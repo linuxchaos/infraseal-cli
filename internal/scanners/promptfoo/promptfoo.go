@@ -2,8 +2,10 @@ package promptfoo
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,7 +46,14 @@ func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolRes
 		filepath.Join(input.RootDir, "promptfoo.yaml"),
 	)
 	if configPath == "" {
-		return scanners.NewResult(s, scanners.StatusDisabled, "disabled", "prompt evaluator is installed, but no compatible configuration is present", nil, started), nil
+		if len(input.TestCases) == 0 {
+			return scanners.NewResult(s, scanners.StatusDisabled, "disabled", "prompt evaluator is installed, but no prompt configuration or InfraSeal test cases are present", nil, started), nil
+		}
+		generated, err := writeGeneratedConfig(input)
+		if err != nil {
+			return scanners.NewResult(s, scanners.StatusError, "real", err.Error(), nil, started), nil
+		}
+		configPath = generated
 	}
 	outfile := filepath.Join(input.ArtifactsDir, "promptfoo-output.json")
 	output, exitCode, err := scanners.RunCommand(ctx, input.RootDir, "promptfoo", "eval", "-c", configPath, "--no-progress-bar", "--no-table", "--no-cache", "--no-write", "--max-concurrency", "1", "--output", outfile)
@@ -203,6 +212,86 @@ func firstExisting(paths ...string) string {
 		}
 	}
 	return ""
+}
+
+func writeGeneratedConfig(input scanners.Input) (string, error) {
+	if input.ArtifactsDir == "" {
+		return "", fmt.Errorf("report artifact directory is not available")
+	}
+	if err := os.MkdirAll(input.ArtifactsDir, 0o755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(input.ArtifactsDir, "promptfoo-generated.yaml")
+	var b strings.Builder
+	b.WriteString("description: InfraSeal offline test-case evaluation\n\n")
+	b.WriteString("prompts:\n  - \"{{actual_output}}\"\n\n")
+	b.WriteString("providers:\n  - id: echo\n    label: InfraSeal exported answer\n\n")
+	b.WriteString("tests:\n")
+	for _, tc := range input.TestCases {
+		b.WriteString("  - description: ")
+		b.WriteString(strconv.Quote(tc.Name))
+		b.WriteString("\n    vars:\n")
+		writeScalar(&b, "actual_output", tc.ActualOutput)
+		writeScalar(&b, "expected_pass", fmt.Sprintf("%t", tc.Pass))
+		writeScalar(&b, "category", tc.Category)
+		writeScalar(&b, "case_description", tc.Description)
+		writeScalar(&b, "unsupported_claim", tc.UnsupportedClaim)
+		writeScalar(&b, "evidence", evidenceForCase(input.RootDir, tc))
+		b.WriteString("    assert:\n")
+		b.WriteString("      - type: javascript\n")
+		b.WriteString("        metric: infraseal-case\n")
+		b.WriteString("        value: |-\n")
+		for _, line := range strings.Split(generatedAssertion(), "\n") {
+			b.WriteString("          ")
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func writeScalar(b *strings.Builder, key, value string) {
+	b.WriteString("      ")
+	b.WriteString(key)
+	b.WriteString(": |-\n")
+	if strings.TrimSpace(value) == "" {
+		b.WriteString("        \n")
+		return
+	}
+	for _, line := range strings.Split(value, "\n") {
+		b.WriteString("        ")
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+}
+
+func evidenceForCase(root string, tc config.TestCase) string {
+	if strings.TrimSpace(tc.EvidenceFile) == "" {
+		return tc.ExpectedBehavior
+	}
+	data, err := os.ReadFile(config.Resolve(root, tc.EvidenceFile))
+	if err != nil {
+		return tc.ExpectedBehavior
+	}
+	return string(data)
+}
+
+func generatedAssertion() string {
+	return `const answer = String(output || '');
+const lowerAnswer = answer.toLowerCase();
+const evidence = String(context.vars.evidence || '').toLowerCase();
+const claim = String(context.vars.unsupported_claim || '').toLowerCase();
+const expectedPass = String(context.vars.expected_pass || '') === 'true';
+if (claim && lowerAnswer.includes(claim) && !evidence.includes(claim)) {
+  return { pass: false, score: 0, reason: ` + "`Unsupported claim absent from evidence: ${claim}`" + ` };
+}
+if (!expectedPass) {
+  return { pass: false, score: 0, reason: ` + "`InfraSeal case marked failing: ${context.vars.case_description || context.vars.category}`" + ` };
+}
+return { pass: true, score: 1, reason: 'InfraSeal case passed' };`
 }
 
 func categories() []string { return []string{"prompt-injection", "output-safety", "pii", "grounding"} }

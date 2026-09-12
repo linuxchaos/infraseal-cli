@@ -106,14 +106,26 @@ type ComplianceRequest struct {
 }
 
 type ReadinessCategory struct {
-	Name              string             `json:"name" yaml:"name"`
-	Score             int                `json:"score" yaml:"score"`
-	Status            string             `json:"status" yaml:"status"`
-	AssessmentSummary string             `json:"assessment_summary" yaml:"assessment_summary"`
-	Strengths         []string           `json:"strengths" yaml:"strengths"`
-	Gaps              []string           `json:"gaps" yaml:"gaps"`
-	ExpectedEvidence  []string           `json:"expected_evidence" yaml:"expected_evidence"`
-	ControlReferences []ControlReference `json:"control_references" yaml:"control_references"`
+	Name              string              `json:"name" yaml:"name"`
+	Score             int                 `json:"score" yaml:"score"`
+	Status            string              `json:"status" yaml:"status"`
+	AssessmentSummary string              `json:"assessment_summary" yaml:"assessment_summary"`
+	Strengths         []string            `json:"strengths" yaml:"strengths"`
+	Gaps              []string            `json:"gaps" yaml:"gaps"`
+	Controls          []ControlAssessment `json:"controls,omitempty" yaml:"controls,omitempty"`
+	ExpectedEvidence  []string            `json:"expected_evidence" yaml:"expected_evidence"`
+	ControlReferences []ControlReference  `json:"control_references" yaml:"control_references"`
+}
+
+type ControlAssessment struct {
+	Name          string   `json:"name" yaml:"name"`
+	Applicability string   `json:"applicability" yaml:"applicability"`
+	Status        string   `json:"status" yaml:"status"`
+	ReviewMethod  string   `json:"review_method" yaml:"review_method"`
+	Summary       string   `json:"summary" yaml:"summary"`
+	Evidence      []string `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	Gaps          []string `json:"gaps,omitempty" yaml:"gaps,omitempty"`
+	NextSteps     []string `json:"next_steps,omitempty" yaml:"next_steps,omitempty"`
 }
 
 type ControlReference struct {

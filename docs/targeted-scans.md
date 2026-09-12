@@ -35,25 +35,25 @@ The most common setup is to put stable defaults in `.infraseal/infraseal.yaml`:
 ```yaml
 inputs:
   include:
-    - prompts/
-    - src/
-    - app/
-    - exports/
-    - infra/
-    - .infraseal/agent-skills/
+    - .
   exclude:
     - .git/**
+    - .github/**
+    - .infraseal/governance/**
+    - .infraseal/test-cases/**
+    - .infraseal/reports/**
     - node_modules/**
     - vendor/**
-    - .infraseal/reports/**
     - '**/*.pdf'
   terraform_plan_json:
     - infra/tfplan.json
 output:
-  formats: [json, markdown, html, csv]
+  formats: [json, markdown, html, csv, pdf]
 ```
 
 Use CLI flags for one-off reviews. CLI targets override YAML targets for that run, while `--exclude` adds to YAML exclusions.
+
+Governance files are excluded from broad technical scans by default and assessed through `infraseal compliance`. Agent skill paths remain configured separately so agent-focused checks can still inspect them.
 
 ## Terraform Plan JSON
 

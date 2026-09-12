@@ -33,6 +33,18 @@ InfraSeal can show whether the repository has evidence, whether that evidence lo
 
 For those non-technical controls, InfraSeal reports addressable gaps and recommends the document, owner, decision record, or workflow evidence needed to improve readiness.
 
+## Report Detail
+
+ISO readiness reports include per-clause control assessments. Each control records whether it appears applicable to the workload, whether the current repository evidence passes, what evidence was checked, which review method was used, and what remains for manual review or remediation.
+
+Examples:
+
+- Assessment scope and exclusions are checked from `inputs.include`, `inputs.targets`, and `inputs.exclude`.
+- Documentation processes are checked from configured governance files and expected content signals.
+- Runtime controls are checked from Terraform plan JSON when present.
+- Agent controls are conditional and become applicable when the workload type or configured files indicate tool or skill use.
+- Open high or critical technical findings from the latest full scan can prevent Clause 8, Clause 9, or Clause 10 readiness.
+
 Official resources:
 
 - [ISO/IEC 42001:2023 official standard page](https://www.iso.org/standard/42001)
@@ -40,9 +52,11 @@ Official resources:
 
 InfraSeal helps organizations prepare for and maintain AI governance programs aligned with ISO/IEC 42001. It does not certify an organization, establish legal compliance, replace an accredited auditor, or guarantee that every applicable control is covered.
 
-## Future Semantic Review
+## Future Questionnaire And Semantic Review
 
-The current pack uses deterministic checks and latest scan evidence. A planned local-LLM mode can inspect governance documents semantically and produce quoted evidence spans, reviewer prompts, model settings, and decision traces while keeping the analysis local or customer-controlled.
+The current pack uses deterministic checks and latest scan evidence. A planned questionnaire will collect human attestations for controls that need organizational evidence, including approval authority, training completion, vendor review, internal review cadence, incident response exercises, and exception handling.
+
+A planned local-LLM mode can inspect governance documents semantically and produce quoted evidence spans, reviewer prompts, model settings, and decision traces while keeping the analysis local or customer-controlled.
 
 Enterprise compliance packs are expected to add custom controls, centralized attestations, approval history, evidence ownership, and continuous monitoring.
 

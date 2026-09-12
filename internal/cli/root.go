@@ -96,7 +96,11 @@ func (a *app) scanCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Minute)
 			defer cancel()
-			result, err := a.engine.RunScan(ctx, schema.ScanRequest{Profile: profile, Runtime: runtimeName, ConfigPath: a.configPath, IncludeToolDetails: a.includeToolDetails, Checks: checks, Targets: targets, Excludes: excludes, OutputFormats: outputFormats})
+			paths, err := resolveScanPaths(cmd, a.configPath, targets)
+			if err != nil {
+				return err
+			}
+			result, err := a.engine.RunScan(ctx, schema.ScanRequest{Profile: profile, Runtime: runtimeName, ConfigPath: paths.configPath, ProjectRoot: paths.projectRoot, IncludeToolDetails: a.includeToolDetails, Checks: checks, Targets: paths.targets, Excludes: excludes, OutputFormats: outputFormats})
 			if err != nil {
 				return err
 			}
@@ -130,9 +134,10 @@ func (a *app) complianceFrameworkCommand(framework, short string) *cobra.Command
 	var failOnReadiness bool
 	var outputFormats []string
 	cmd := &cobra.Command{
-		Use:   framework,
-		Short: short,
-		Args:  cobra.NoArgs,
+		Use:     framework,
+		Aliases: complianceAliases(framework),
+		Short:   short,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Minute)
 			defer cancel()
@@ -257,6 +262,19 @@ func (a *app) versionCommand() *cobra.Command {
 	}}
 }
 
+func complianceAliases(framework string) []string {
+	switch framework {
+	case "iso42001":
+		return []string{"iso-42001", "iso", "isoiec42001"}
+	case "nist-ai-rmf":
+		return []string{"nist", "ai-rmf", "nistairmf"}
+	case "aiuc1":
+		return []string{"aiuc", "aiuc-1"}
+	default:
+		return nil
+	}
+}
+
 func printScan(out io.Writer, result schema.ScanResult, includeTools bool) {
 	fmt.Fprintln(out, "InfraSeal AI Assurance")
 	fmt.Fprintf(out, "\nProject:      %s\n", result.ProjectName)
@@ -314,6 +332,18 @@ func printCompliance(out io.Writer, result schema.ComplianceResult, includeTools
 		fmt.Fprintln(out, "  Expected evidence:")
 		for _, evidence := range category.ExpectedEvidence {
 			fmt.Fprintf(out, "    - %s\n", evidence)
+		}
+		if len(category.Controls) > 0 {
+			fmt.Fprintln(out, "  Control assessment:")
+			for _, control := range category.Controls {
+				fmt.Fprintf(out, "    - %-18s %-16s %s\n", strings.ToUpper(control.Status), control.Applicability, control.Name)
+				if control.Summary != "" {
+					fmt.Fprintf(out, "      %s\n", control.Summary)
+				}
+				for _, gap := range control.Gaps {
+					fmt.Fprintf(out, "      Gap: %s\n", gap)
+				}
+			}
 		}
 		fmt.Fprintln(out, "  Benchmark mapping:")
 		for _, reference := range category.ControlReferences {
@@ -488,4 +518,211 @@ func unwrapPathError(err error) error {
 		}
 		return err
 	}
+}
+
+type scanPaths struct {
+	configPath  string
+	projectRoot string
+	targets     []string
+}
+
+func resolveScanPaths(cmd *cobra.Command, configPath string, targets []string) (scanPaths, error) {
+	if configPath == "" {
+		configPath = config.DefaultPath
+	}
+	if _, err := os.Stat(configPath); err == nil {
+		normalizedTargets := normalizeCLITargetsFromBase(targets, config.Root(configPath))
+		return scanPaths{configPath: configPath, targets: normalizedTargets}, nil
+	}
+	if configFlagChanged(cmd) {
+		return scanPaths{}, missingConfigMessage(configPath)
+	}
+	normalizedTargets := normalizeCLITargets(targets)
+	if discovered, err := discoverConfigFromTargets(targets); err != nil {
+		return scanPaths{}, err
+	} else if discovered != "" {
+		return scanPaths{configPath: discovered, targets: normalizedTargets}, nil
+	}
+	root := inferredProjectRoot(normalizedTargets)
+	if root == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return scanPaths{}, err
+		}
+		root = cwd
+	}
+	return scanPaths{configPath: configPath, projectRoot: root, targets: normalizedTargets}, nil
+}
+
+func configFlagChanged(cmd *cobra.Command) bool {
+	flag := cmd.Flag("config")
+	return flag != nil && flag.Changed
+}
+
+func normalizeCLITargets(targets []string) []string {
+	return normalizeCLITargetsFromBase(targets, "")
+}
+
+func normalizeCLITargetsFromBase(targets []string, base string) []string {
+	var values []string
+	for _, target := range targets {
+		target = strings.TrimSpace(target)
+		if target == "" {
+			continue
+		}
+		if filepath.IsAbs(target) {
+			values = append(values, filepath.Clean(target))
+			continue
+		}
+		if hasGlobChars(target) {
+			if base == "" {
+				values = append(values, filepath.Clean(target))
+			} else {
+				values = append(values, filepath.ToSlash(filepath.Clean(target)))
+			}
+			continue
+		}
+		if base != "" {
+			values = append(values, filepath.Join(base, filepath.FromSlash(target)))
+			continue
+		}
+		abs, err := filepath.Abs(target)
+		if err != nil {
+			values = append(values, target)
+			continue
+		}
+		values = append(values, abs)
+	}
+	return values
+}
+
+func discoverConfigFromTargets(targets []string) (string, error) {
+	found := map[string]bool{}
+	for _, target := range targets {
+		start := staticTargetBase(strings.TrimSpace(target))
+		if start == "" {
+			continue
+		}
+		if cfg := nearestConfig(start); cfg != "" {
+			found[cfg] = true
+		}
+	}
+	if len(found) == 0 {
+		return "", nil
+	}
+	if len(found) > 1 {
+		var configs []string
+		for path := range found {
+			configs = append(configs, path)
+		}
+		return "", fmt.Errorf("multiple InfraSeal configs matched the selected targets: %s; pass --config to choose one", strings.Join(configs, ", "))
+	}
+	for path := range found {
+		return path, nil
+	}
+	return "", nil
+}
+
+func staticTargetBase(target string) string {
+	if target == "" {
+		return ""
+	}
+	if hasGlobChars(target) {
+		for {
+			dir := filepath.Dir(target)
+			if dir == target || !hasGlobChars(dir) {
+				target = dir
+				break
+			}
+			target = dir
+		}
+	}
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		return ""
+	}
+	info, err := os.Stat(abs)
+	if err == nil && !info.IsDir() {
+		return filepath.Dir(abs)
+	}
+	if err != nil {
+		return filepath.Dir(abs)
+	}
+	return abs
+}
+
+func nearestConfig(start string) string {
+	dir := filepath.Clean(start)
+	for {
+		candidate := filepath.Join(dir, filepath.FromSlash(config.DefaultPath))
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+func inferredProjectRoot(targets []string) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	var roots []string
+	for _, target := range targets {
+		if hasGlobChars(target) {
+			continue
+		}
+		path := target
+		if !filepath.IsAbs(path) {
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				continue
+			}
+			path = abs
+		}
+		info, err := os.Stat(path)
+		if err == nil && !info.IsDir() {
+			path = filepath.Dir(path)
+		}
+		roots = append(roots, filepath.Clean(path))
+	}
+	if len(roots) == 0 {
+		return ""
+	}
+	root := roots[0]
+	for _, next := range roots[1:] {
+		root = commonAncestor(root, next)
+	}
+	return root
+}
+
+func commonAncestor(left, right string) string {
+	leftParts := strings.Split(filepath.Clean(left), string(os.PathSeparator))
+	rightParts := strings.Split(filepath.Clean(right), string(os.PathSeparator))
+	limit := len(leftParts)
+	if len(rightParts) < limit {
+		limit = len(rightParts)
+	}
+	var parts []string
+	for index := 0; index < limit; index++ {
+		if !strings.EqualFold(leftParts[index], rightParts[index]) {
+			break
+		}
+		parts = append(parts, leftParts[index])
+	}
+	if len(parts) == 0 {
+		return left
+	}
+	return filepath.Clean(strings.Join(parts, string(os.PathSeparator)))
+}
+
+func hasGlobChars(value string) bool {
+	return strings.ContainsAny(value, "*?[")
+}
+
+func missingConfigMessage(path string) error {
+	return fmt.Errorf("InfraSeal config not found at %s; run `infraseal init` from the repository root, pass `--config path/to/.infraseal/infraseal.yaml`, or run `infraseal scan --profile full --target path/to/repo` for a first technical scan without a config", path)
 }

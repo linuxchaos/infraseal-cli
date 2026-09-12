@@ -2,7 +2,7 @@
 
 This is the only InfraSeal document that intentionally names backend tools. End-user CLI output and generated reports use InfraSeal capability labels instead.
 
-None of these tools is required to run MCPvia native checks, targeted text checks, deterministic grounding checks, Terraform plan review, governance assessment, ISO readiness, or local reports. Install only the coverage relevant to the repository. Missing dependencies are reported as unavailable and do not create synthetic findings.
+None of these tools is required to run MCPvia native checks, targeted text checks, deterministic grounding checks, Terraform plan review, governance assessment, ISO readiness, or local reports. Install only the coverage relevant to the repository. Missing dependencies are reported as unavailable and do not create findings.
 
 ## Promptfoo
 
@@ -13,7 +13,9 @@ npm install -g promptfoo
 promptfoo --version
 ```
 
-Add `promptfooconfig.yaml` or `.infraseal/promptfooconfig.yaml`. A provider or deterministic local provider must be configured according to Promptfoo documentation. Without that file, InfraSeal marks this capability disabled and records no findings from this adapter.
+Add `promptfooconfig.yaml` or `.infraseal/promptfooconfig.yaml` when you want to own the Promptfoo suite directly. A provider or deterministic local provider must be configured according to Promptfoo documentation.
+
+If Promptfoo is installed and no Promptfoo config exists, InfraSeal generates an offline Promptfoo config from `.infraseal/test-cases/*.yaml` and evaluates the exported `actual_output` fields with deterministic assertions. If no Promptfoo config and no InfraSeal test cases exist, this capability is disabled for that run.
 
 ## Giskard
 

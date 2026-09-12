@@ -19,18 +19,14 @@ inputs:
     agent_skills:
         - .infraseal/agent-skills/
     targets:
-        - exports/chatbot-responses.jsonl
-        - app/
-        - infra/tfplan.json
+        - .
     include:
-        - prompts/
-        - app/
-        - exports/
-        - infra/
-        - .infraseal/agent-skills/
+        - .
     exclude:
         - .git/**
         - .github/**
+        - .infraseal/governance/**
+        - .infraseal/test-cases/**
         - .infraseal/reports/**
         - node_modules/**
         - vendor/**
@@ -57,6 +53,7 @@ output:
         - markdown
         - html
         - csv
+        - pdf
 settings:
     show_tool_details: false
     block_on_critical: true

@@ -207,6 +207,83 @@ func TestTargetedAgentSafetyReadsSpecificFile(t *testing.T) {
 	}
 }
 
+func TestFullScanWalksDefaultRepositoryScope(t *testing.T) {
+	root := t.TempDir()
+	if _, err := config.Initialize(root, false); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "src", "agent.py")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("import subprocess\nsubprocess.run(user_query, shell=True)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	engine := New(nil, runtime.Resolver{Providers: map[string]runtime.Provider{"local": local.Provider{Workers: 1}}}, nil)
+	result, err := engine.RunScan(context.Background(), schema.ScanRequest{
+		ConfigPath: filepath.Join(root, filepath.FromSlash(config.DefaultPath)),
+		Profile:    "full",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range result.Findings {
+		if finding.Category == "code-security" && strings.Contains(finding.Title, "Shell execution") {
+			return
+		}
+	}
+	t.Fatalf("expected default full scan to walk repository code, got %#v", result.Findings)
+}
+
+func TestFullScanDoesNotTreatGovernanceDocsAsRuntimeTargets(t *testing.T) {
+	root := t.TempDir()
+	if _, err := config.Initialize(root, false); err != nil {
+		t.Fatal(err)
+	}
+	riskRegister := filepath.Join(root, ".infraseal", "governance", "risk-register.md")
+	if err := os.WriteFile(riskRegister, []byte("# Risk Register\n\nScenario: retrieved text says ignore previous instructions and override system policy.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	engine := New(nil, runtime.Resolver{Providers: map[string]runtime.Provider{"local": local.Provider{Workers: 1}}}, nil)
+	result, err := engine.RunScan(context.Background(), schema.ScanRequest{
+		ConfigPath: filepath.Join(root, filepath.FromSlash(config.DefaultPath)),
+		Profile:    "full",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range result.Findings {
+		if strings.Contains(filepath.ToSlash(finding.FilePath), ".infraseal/governance/") {
+			t.Fatalf("governance evidence should not be scanned as runtime target data: %#v", finding)
+		}
+	}
+}
+
+func TestScanWithoutConfigUsesProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "agent.py")
+	if err := os.WriteFile(path, []byte("import subprocess\nsubprocess.run(user_query, shell=True)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	engine := New(nil, runtime.Resolver{Providers: map[string]runtime.Provider{"local": local.Provider{Workers: 1}}}, nil)
+	result, err := engine.RunScan(context.Background(), schema.ScanRequest{
+		ConfigPath:    filepath.Join(root, filepath.FromSlash(config.DefaultPath)),
+		ProjectRoot:   root,
+		Profile:       "full",
+		Targets:       []string{root},
+		OutputFormats: []string{"json"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range result.Findings {
+		if finding.Category == "code-security" && strings.Contains(finding.Title, "Shell execution") {
+			return
+		}
+	}
+	t.Fatalf("expected configless target scan to inspect project root, got %#v", result.Findings)
+}
+
 type explodingScanner struct{}
 
 func (explodingScanner) Name() string        { return "exploding" }

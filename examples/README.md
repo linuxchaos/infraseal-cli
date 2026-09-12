@@ -16,4 +16,4 @@ The sample is shaped like a small development team repository. It includes:
 - `.infraseal/test-cases/`: evaluation cases
 - `.infraseal/agent-skills/`: agent skill evidence
 
-See [sample-output.md](sample-output.md) for an abbreviated terminal result.
+See [sample-output.md](sample-output.md) for an abbreviated terminal result and [local-verification.md](local-verification.md) for the pass/fail scanner sample matrix.

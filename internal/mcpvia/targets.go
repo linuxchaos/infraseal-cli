@@ -187,6 +187,44 @@ func nativeTargetFindings(root string, targets, checks, excludes []string) []sch
 				}
 			}
 		}
+		if containsCheck(checks, "code-security") {
+			findings = append(findings, codeSecurityFindings(rel, text)...)
+		}
+	}
+	return findings
+}
+
+func codeSecurityFindings(path, text string) []schema.Finding {
+	lower := strings.ToLower(text)
+	rules := []struct {
+		needle string
+		title  string
+		action string
+	}{
+		{"shell=true", "Shell execution is enabled from application code", "Avoid shell execution for user-controlled values; call the intended binary directly and validate arguments."},
+		{"eval(", "Dynamic evaluation is used in application code", "Remove dynamic evaluation or tightly constrain input before execution."},
+		{"exec(", "Dynamic code execution is used in application code", "Replace dynamic execution with explicit handlers and record an approval exception if unavoidable."},
+		{"ignore previous instructions", "Prompt-injection text is embedded in application code", "Treat injection strings as test fixtures only and keep them in evaluation cases, not runtime prompts."},
+		{"reveal the system prompt", "System-prompt disclosure pattern is embedded in application code", "Move disclosure attempts into regression tests and keep runtime prompts focused on refusal behavior."},
+		{"tenant_id = \"*\"", "Tenant isolation is bypassed in application code", "Require tenant-scoped queries and add a regression test for cross-tenant access."},
+		{"where 1=1", "Broad database query pattern is present", "Replace broad query construction with parameterized, tenant-scoped access."},
+	}
+	var findings []schema.Finding
+	for _, rule := range rules {
+		if strings.Contains(lower, rule.needle) {
+			findings = append(findings, targetedFinding("high", "code-security", rule.title, rule.needle, path, rule.action))
+		}
+	}
+	if strings.Contains(lower, "openai_api_key") || strings.Contains(lower, "anthropic_api_key") || strings.Contains(lower, "api_key") {
+		if match := secretPattern.FindString(text); match != "" {
+			findings = append(findings, targetedFinding("high", "credential-exposure", "Hardcoded API credential pattern detected", redact(match), path, "Move model-provider credentials to a managed secret store and rotate exposed values."))
+		}
+	}
+	if strings.EqualFold(filepath.Ext(path), ".go") && strings.Contains(lower, "os.readfile(") && strings.Contains(lower, "user") {
+		findings = append(findings, targetedFinding("medium", "code-security", "Go file read appears tied to user-controlled input", "os.ReadFile", path, "Constrain file reads to approved directories and validate resolved paths."))
+	}
+	if strings.EqualFold(filepath.Ext(path), ".py") && strings.Contains(lower, "subprocess.") && strings.Contains(lower, "shell=true") {
+		findings = append(findings, targetedFinding("high", "code-security", "Python subprocess call uses shell=True", "subprocess shell=True", path, "Use an argument list with shell disabled and validate user-provided values."))
 	}
 	return findings
 }

@@ -84,7 +84,7 @@ func (s Scanner) Scan(ctx context.Context, input scanners.Input) (schema.ToolRes
 		}
 		cases = append(cases, map[string]any{"name": tc.Name, "answer": tc.ActualOutput, "evidence_file": tc.EvidenceFile, "resolved_evidence": strings.TrimSpace(string(evidence)), "supported": tc.Pass && !claimUnsupported})
 	}
-	productionCases, err := loadProductionCases(input.RootDir, input.Targets)
+	productionCases, err := loadProductionCases(input.RootDir, input.Targets, input.Excludes)
 	if err != nil {
 		findings = append(findings, schema.Finding{Severity: "medium", Category: "evidence-coverage", Title: "Production chatbot export could not be parsed", Description: err.Error(), Evidence: err.Error(), Recommendation: "Use the documented JSON, JSONL, or YAML chatbot export schema."})
 	}
@@ -136,17 +136,27 @@ type productionCase struct {
 	BaseDir          string `json:"-" yaml:"-"`
 }
 
-func loadProductionCases(root string, targets []string) ([]productionCase, error) {
+func loadProductionCases(root string, targets, excludes []string) ([]productionCase, error) {
 	var cases []productionCase
 	for _, target := range targets {
 		info, err := os.Stat(target)
-		if err != nil {
+		if err != nil || config.ShouldExclude(root, target, excludes) {
 			continue
 		}
 		var files []string
+		explicitFile := !info.IsDir()
 		if info.IsDir() {
 			_ = filepath.WalkDir(target, func(path string, entry os.DirEntry, walkErr error) error {
-				if walkErr == nil && !entry.IsDir() {
+				if walkErr != nil {
+					return nil
+				}
+				if config.ShouldExclude(root, path, excludes) {
+					if entry.IsDir() {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				if !entry.IsDir() {
 					files = append(files, path)
 				}
 				return nil
@@ -157,6 +167,9 @@ func loadProductionCases(root string, targets []string) ([]productionCase, error
 		for _, path := range files {
 			ext := strings.ToLower(filepath.Ext(path))
 			if ext != ".json" && ext != ".jsonl" && ext != ".yaml" && ext != ".yml" {
+				continue
+			}
+			if !explicitFile && !looksLikeProductionExport(root, path) {
 				continue
 			}
 			decoded, err := decodeProductionFile(path)
@@ -178,6 +191,24 @@ func loadProductionCases(root string, targets []string) ([]productionCase, error
 		}
 	}
 	return cases, nil
+}
+
+func looksLikeProductionExport(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		rel = path
+	}
+	value := strings.ToLower(filepath.ToSlash(rel))
+	if strings.Contains(value, "/exports/") || strings.HasPrefix(value, "exports/") {
+		return true
+	}
+	name := strings.ToLower(filepath.Base(path))
+	for _, token := range []string{"chatbot", "response", "responses", "production", "transcript", "output", "answers"} {
+		if strings.Contains(name, token) {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeProductionFile(path string) ([]productionCase, error) {

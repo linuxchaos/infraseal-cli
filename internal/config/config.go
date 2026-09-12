@@ -111,12 +111,12 @@ func Default(projectName string) Config {
 			Evidence:          []string{".infraseal/evidence/knowledge-base.md"},
 			TestCases:         []string{".infraseal/test-cases/*.yaml"},
 			AgentSkills:       []string{".infraseal/agent-skills/"},
-			Targets:           []string{"prompts/", "app/", "src/", "cmd/", "internal/", "exports/", ".infraseal/agent-skills/"},
-			Include:           []string{"prompts/", "app/", "src/", "cmd/", "internal/", "exports/", ".infraseal/agent-skills/", "infra/"},
+			Targets:           []string{"."},
+			Include:           []string{"."},
 			Exclude:           DefaultExcludes(),
 			TerraformPlanJSON: []string{"infra/tfplan.json", "infra/terraform-plan.json", ".infraseal/evidence/tfplan.json"},
 		},
-		Output:   OutputConfig{Formats: []string{"json", "markdown", "html", "csv"}},
+		Output:   OutputConfig{Formats: []string{"json", "markdown", "html", "csv", "pdf"}},
 		Settings: SettingsConfig{BlockOnCritical: true, MinimumReadinessScore: 80},
 		Governance: GovernanceConfig{
 			ReevaluateOnChange:      true,
@@ -160,11 +160,9 @@ func Load(path string) (Config, error) {
 		cfg.Settings.MinimumReadinessScore = 80
 	}
 	if len(cfg.Output.Formats) == 0 {
-		cfg.Output.Formats = []string{"json", "markdown", "html", "csv"}
+		cfg.Output.Formats = []string{"json", "markdown", "html", "csv", "pdf"}
 	}
-	if cfg.Inputs.Exclude == nil {
-		cfg.Inputs.Exclude = DefaultExcludes()
-	}
+	cfg.Inputs.Exclude = MergeExcludes(cfg.Inputs.Exclude, DefaultExcludes())
 	return cfg, nil
 }
 
@@ -222,6 +220,8 @@ func DefaultExcludes() []string {
 	return []string{
 		".git/**",
 		".github/**",
+		".infraseal/governance/**",
+		".infraseal/test-cases/**",
 		".infraseal/reports/**",
 		"node_modules/**",
 		"vendor/**",

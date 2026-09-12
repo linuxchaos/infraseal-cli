@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,10 +60,19 @@ func (e *Orchestrator) runScan(ctx context.Context, request schema.ScanRequest, 
 	}
 	input, err := prepare(request.ConfigPath)
 	if err != nil {
-		return nil, err
+		if request.ProjectRoot == "" || !missingConfig(err) {
+			return nil, err
+		}
+		input, err = prepareDefault(request.ProjectRoot)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if request.ProjectRoot != "" {
-		input.root = request.ProjectRoot
+		input, err = prepareFromConfig(input.cfg, request.ProjectRoot)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if request.ProjectName != "" {
 		input.cfg.Project.Name = request.ProjectName
@@ -81,6 +91,9 @@ func (e *Orchestrator) runScan(ctx context.Context, request schema.ScanRequest, 
 		} else {
 			targetPatterns = input.cfg.Inputs.Targets
 		}
+	}
+	if len(targetPatterns) == 0 {
+		targetPatterns = []string{"."}
 	}
 	excludes := config.MergeExcludes(input.cfg.Inputs.Exclude, request.Excludes)
 	targets := existing(config.ExpandWithExcludes(input.root, targetPatterns, excludes))
@@ -175,7 +188,7 @@ func (e *Orchestrator) RunCompliancePack(ctx context.Context, request schema.Com
 	toolResults := latestScanEvidence(input.root)
 	result := iso42001.AssessFramework(iso42001.Input{
 		AssessmentID: assessmentID, RootDir: input.root, Runtime: runtimeLabel, Config: input.cfg,
-		TestCases: input.cases, TestSources: input.testSources, Evidence: input.evidence, ToolResults: toolResults, StartedAt: started,
+		TestCases: input.cases, TestSources: input.testSources, Evidence: input.evidence, AgentSkills: input.agentSkills, ToolResults: toolResults, StartedAt: started,
 	}, framework)
 	if e.Reports != nil {
 		paths, err := e.Reports.GenerateCompliance(input.root, &result, outputFormats(input.cfg.Output.Formats, request.OutputFormats), request.IncludeToolDetails || input.cfg.Settings.ShowToolDetails)
@@ -258,11 +271,37 @@ func prepare(configPath string) (prepared, error) {
 		return prepared{}, err
 	}
 	root := config.Root(abs)
-	cases, sources, err := config.LoadTestCases(root, cfg.Inputs.TestCases)
+	return prepareFromConfig(cfg, root)
+}
+
+func prepareDefault(root string) (prepared, error) {
+	abs, err := filepath.Abs(root)
 	if err != nil {
 		return prepared{}, err
 	}
-	return prepared{cfg: cfg, root: root, cases: cases, testSources: sources, evidence: existing(config.Expand(root, cfg.Inputs.Evidence)), agentSkills: existing(config.Expand(root, cfg.Inputs.AgentSkills)), excludes: cfg.Inputs.Exclude}, nil
+	cfg := config.Default(filepath.Base(abs))
+	cfg.Inputs.Evidence = []string{".infraseal/evidence/*.md", "docs/**/*.md", "knowledge_base.md", "knowledge-base.md"}
+	cfg.Inputs.TestCases = []string{".infraseal/test-cases/*.yaml", "evals/**/*.yaml", "tests/ai/**/*.yaml"}
+	cfg.Inputs.AgentSkills = []string{".infraseal/agent-skills/", "agents/", "skills/"}
+	cfg.Inputs.TerraformPlanJSON = []string{"infra/tfplan.json", "infra/terraform-plan.json", ".infraseal/evidence/tfplan.json", "**/*tfplan*.json", "**/*terraform*plan*.json"}
+	return prepareFromConfig(cfg, abs)
+}
+
+func prepareFromConfig(cfg config.Config, root string) (prepared, error) {
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return prepared{}, err
+	}
+	cases, sources, err := config.LoadTestCases(abs, cfg.Inputs.TestCases)
+	if err != nil {
+		return prepared{}, err
+	}
+	return prepared{cfg: cfg, root: abs, cases: cases, testSources: sources, evidence: existing(config.Expand(abs, cfg.Inputs.Evidence)), agentSkills: existing(config.Expand(abs, cfg.Inputs.AgentSkills)), excludes: cfg.Inputs.Exclude}, nil
+}
+
+func missingConfig(err error) bool {
+	var pathErr *os.PathError
+	return errors.As(err, &pathErr) && os.IsNotExist(pathErr.Err)
 }
 
 func existing(paths []string) []string {
@@ -463,15 +502,32 @@ func relativePaths(root string, paths []string) []string {
 
 func filterFindings(root string, findings []schema.Finding, excludes []string) []schema.Finding {
 	if len(excludes) == 0 {
+		for index := range findings {
+			findings[index].FilePath = normalizeFindingPath(root, findings[index].FilePath)
+		}
 		return findings
 	}
 	var filtered []schema.Finding
 	for _, finding := range findings {
 		if finding.FilePath == "" || !config.ShouldExclude(root, finding.FilePath, excludes) {
+			finding.FilePath = normalizeFindingPath(root, finding.FilePath)
 			filtered = append(filtered, finding)
 		}
 	}
 	return filtered
+}
+
+func normalizeFindingPath(root, path string) string {
+	if strings.TrimSpace(path) == "" {
+		return ""
+	}
+	clean := filepath.Clean(filepath.FromSlash(path))
+	if filepath.IsAbs(clean) {
+		if rel, err := filepath.Rel(root, clean); err == nil && !strings.HasPrefix(rel, "..") {
+			clean = rel
+		}
+	}
+	return filepath.ToSlash(clean)
 }
 
 func filterFindingsForChecks(findings []schema.Finding, checks []string) []schema.Finding {
@@ -526,7 +582,7 @@ func nativeTargetChecks(profile string, checks []string) []string {
 	case "quick":
 		return []string{"prompt-injection", "pii", "output-safety"}
 	case "full":
-		return []string{"prompt-injection", "pii", "output-safety", "agent-safety"}
+		return []string{"prompt-injection", "pii", "output-safety", "agent-safety", "code-security"}
 	case "agent":
 		return []string{"prompt-injection", "pii", "output-safety", "agent-safety"}
 	default:

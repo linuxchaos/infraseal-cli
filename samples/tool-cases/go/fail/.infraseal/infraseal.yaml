@@ -18,7 +18,6 @@ output:
 settings:
   block_on_critical: true
   minimum_readiness_score: 100
-  allow_mocked_scanners: false
 scanners:
   hallbayes_backend: dummy
   disabled: []

@@ -29,6 +29,7 @@ type Input struct {
 	TestCases    []config.TestCase
 	TestSources  []string
 	Evidence     []string
+	AgentSkills  []string
 	ToolResults  []schema.ToolResult
 	StartedAt    time.Time
 }
@@ -91,6 +92,7 @@ func AssessFramework(input Input, framework string) schema.ComplianceResult {
 			{Framework: "ISO/IEC 42001", Reference: "ISO 42001 explained", Topic: "Official overview of AI management system requirements", URL: explainerURL},
 		}
 	}
+	categories = attachControlAssessments(framework, input, categories)
 	findings = append(findings, toolFindings(input.ToolResults)...)
 	findings = benchmarks.Annotate(findings)
 	overall := 0
@@ -667,6 +669,221 @@ func documentStatus(input Input, path string) (string, bool, string) {
 		return rel, false, "missing expected content: " + strings.Join(missing, ", ")
 	}
 	return rel, true, ""
+}
+
+func attachControlAssessments(framework string, input Input, categories []schema.ReadinessCategory) []schema.ReadinessCategory {
+	if framework != "iso42001" {
+		return categories
+	}
+	for index := range categories {
+		categories[index].Controls = isoControls(input, categories[index].Name)
+		if categories[index].Status == "PASS" && controlsNeedAttention(categories[index].Controls) {
+			categories[index].Status = "WARN"
+		}
+	}
+	return categories
+}
+
+func controlsNeedAttention(controls []schema.ControlAssessment) bool {
+	for _, control := range controls {
+		switch control.Status {
+		case "needs-evidence", "needs-remediation":
+			return true
+		}
+	}
+	return false
+}
+
+func isoControls(input Input, category string) []schema.ControlAssessment {
+	switch category {
+	case "Clause 4 - Context":
+		return []schema.ControlAssessment{
+			metadataControl("AI system identity and intended-use context", "applicable", input.Config.Project.Name != "" && input.Config.Project.Purpose != "" && input.Config.Project.Type != "", []string{"project.name", "project.type", "project.purpose"}, "Project metadata identifies the AI system, workload class, and intended purpose.", "Add project name, workload type, intended users, business purpose, and operating boundaries."),
+			metadataControl("Assessment scope and exclusions", "applicable", (len(input.Config.Inputs.Include) > 0 || len(input.Config.Inputs.Targets) > 0) && len(input.Config.Inputs.Exclude) > 0, []string{"inputs.include", "inputs.targets", "inputs.exclude"}, "Configured scan scope and exclusions define what InfraSeal reviewed.", "Declare included paths and excluded/generated paths in `.infraseal/infraseal.yaml`."),
+			documentControl(input, "Impact assessment process", "applicable", input.Config.Governance.ImpactAssessment, "impact assessment should identify stakeholders, intended users, foreseeable misuse, harms, safeguards, and a go/no-go decision"),
+			documentControl(input, "Data lineage and evidence boundary", "applicable", input.Config.Governance.DataLineage, "data lineage should map prompts, retrieval sources, logs, personal data, retention, storage, and access ownership"),
+		}
+	case "Clause 5 - Leadership":
+		return []schema.ControlAssessment{
+			metadataControl("Accountability and ownership", "applicable", input.Config.Project.Owner != "" && input.Config.Governance.DataOwner != "", []string{"project.owner", "governance.data_owner"}, "Accountable AI and data ownership are declared for release review.", "Assign an AI system owner and data owner with authority over risk acceptance."),
+			metadataControl("Approval authority and human review", "applicable", input.Config.Governance.ApprovalWorkflow != "" && input.Config.Governance.HumanReviewRequired, []string{"governance.approval_workflow", "governance.human_review_required"}, "Release approval and human review requirements are represented in configuration.", "Document who approves release, what evidence is required, and which actions require human review."),
+			documentControl(input, "AI policy process", "applicable", input.Config.Governance.PolicyPath, "policy should cover permitted use, prohibited use, data handling, security expectations, release criteria, and exceptions"),
+			documentControl(input, "Training and attestation process", "applicable", input.Config.Governance.TrainingRecords, "training records should identify roles, training completion, policy attestation, reviewers, and exceptions"),
+		}
+	case "Clause 6 - Planning":
+		return []schema.ControlAssessment{
+			documentControl(input, "AI risk register process", "applicable", input.Config.Governance.RiskRegister, "risk register should include owners, likelihood or impact, treatment, status, due dates, and residual risk"),
+			documentControl(input, "Impact and safeguards planning", "applicable", input.Config.Governance.ImpactAssessment, "impact assessment should connect foreseeable misuse and harms to safeguards and release decisions"),
+			metadataControl("Release gates and risk treatment settings", "applicable", input.Config.Settings.MinimumReadinessScore > 0 && input.Config.Settings.BlockOnCritical && input.Config.Governance.RemediationTracking != "", []string{"settings.minimum_readiness_score", "settings.block_on_critical", "governance.remediation_tracking"}, "Readiness threshold, critical-finding gate, and remediation tracker are configured.", "Set a readiness threshold, block critical findings, and define where finding owners, due dates, and closure evidence are tracked."),
+			metadataControl("Change-triggered reassessment", "applicable", input.Config.Governance.ReevaluateOnChange, []string{"governance.reevaluate_on_change"}, "Material changes are configured to require re-evaluation.", "Require re-evaluation after prompt, model, data, dependency, tool, or infrastructure changes."),
+		}
+	case "Clause 7 - Support":
+		return []schema.ControlAssessment{
+			metadataControl("Traceable evaluation evidence", "applicable", len(input.Evidence) > 0 && len(input.TestSources) > 0 && len(input.Config.Output.Formats) > 0, []string{"inputs.evidence", "inputs.test_cases", "output.formats"}, "Evidence files, test cases, and retained report formats are configured.", "Add versioned evidence, test cases, and retained report outputs."),
+			documentControl(input, "Model or workload card", "applicable", input.Config.Governance.ModelCard, "model card should include model/provider identity, intended use, limitations, evaluation summary, failure modes, and monitoring triggers"),
+			documentControl(input, "Supplier and provider review", "conditional", input.Config.Governance.VendorReview, "vendor review should describe provider dependencies, data sharing, retention terms, security review, contractual controls, and exit criteria"),
+			documentControl(input, "Competence and awareness evidence", "applicable", input.Config.Governance.TrainingRecords, "training records should show role-based AI and security awareness for operators, reviewers, and owners"),
+		}
+	case "Clause 8 - Operation":
+		return []schema.ControlAssessment{
+			metadataControl("Operational test coverage", "applicable", len(input.Config.Inputs.Prompts) > 0 && len(input.TestCases) > 0, []string{"inputs.prompts", "inputs.test_cases"}, "Prompt inputs and operational test cases are configured.", "Add prompt templates and regression cases for the AI workload."),
+			testCaseControl(input, "Prompt-injection and jailbreak coverage", "applicable", "prompt-injection", "Add prompt-injection and jailbreak cases that must block release on failure."),
+			testCaseControl(input, "Grounding and hallucination coverage", "applicable", "grounding", "Add grounding or hallucination cases tied to approved evidence."),
+			testCaseControl(input, "Privacy and unsafe-output coverage", "applicable", "pii", "Add PII, credential leakage, unsafe output, and refusal-boundary cases."),
+			agentControl(input),
+			terraformControl(input),
+			latestScanControl(input, "Operational findings gate", "applicable", "prompt-injection", "pii", "privacy", "credential", "output-safety", "grounding", "hallucination", "agent-safety", "runtime-security", "code-security", "dependency", "iam-policy"),
+		}
+	case "Clause 9 - Performance Evaluation":
+		return []schema.ControlAssessment{
+			metadataControl("Latest scan evidence for measurement", "applicable", len(input.ToolResults) > 0, []string{".infraseal/reports/latest-scan.json"}, "Readiness uses the latest local scan report as measurement evidence.", "Run `infraseal scan --profile full` before readiness review."),
+			documentControl(input, "Monitoring and metrics process", "applicable", input.Config.Governance.MonitoringPlan, "monitoring plan should include metrics, cadence, owner, thresholds, issue tracking, and evidence retention"),
+			metadataControl("Evaluation cadence", "applicable", input.Config.Governance.EvaluationCadence != "", []string{"governance.evaluation_cadence"}, "Recurring evaluation cadence is configured.", "Define when scans run, who reviews them, and what blocks deployment."),
+			documentControl(input, "Decision and review audit trail", "applicable", input.Config.Governance.AuditLog, "audit log should link decisions, approvals or exceptions, reports, incidents, changes, releases, and closure evidence"),
+			latestScanControl(input, "High-risk measurement findings", "applicable", "prompt-injection", "pii", "privacy", "credential", "output-safety", "grounding", "hallucination", "agent-safety", "runtime-security", "code-security", "dependency", "iam-policy"),
+		}
+	case "Clause 10 - Improvement":
+		return []schema.ControlAssessment{
+			documentControl(input, "Change-management process", "applicable", input.Config.Governance.ChangeManagement, "change management should define changes that require reassessment, approval, and release evidence"),
+			documentControl(input, "Incident and nonconformity response", "applicable", input.Config.Governance.IncidentResponseRunbook, "incident runbook should define triage, containment, evidence preservation, notification, remediation, re-approval, and post-incident review"),
+			metadataControl("Corrective-action tracking", "applicable", input.Config.Governance.RemediationTracking != "", []string{"governance.remediation_tracking"}, "Finding ownership, due dates, and closure evidence have a configured tracker.", "Define a tracker for findings, corrective actions, owners, due dates, and acceptance decisions."),
+			metadataControl("Continual improvement trigger", "applicable", input.Config.Governance.ReevaluateOnChange, []string{"governance.reevaluate_on_change"}, "Material changes trigger re-evaluation.", "Use release and incident outcomes to update tests, policies, prompts, retrieval evidence, tools, and infrastructure."),
+			criticalClosureControl(input),
+		}
+	default:
+		return nil
+	}
+}
+
+func metadataControl(name, applicability string, pass bool, evidence []string, summary, next string) schema.ControlAssessment {
+	status := "pass"
+	var gaps, steps []string
+	if !pass {
+		status = "needs-evidence"
+		gaps = append(gaps, summary)
+		steps = append(steps, next)
+	} else if next != "" {
+		steps = append(steps, "Confirm the documented process is followed in operating records.")
+	}
+	return schema.ControlAssessment{
+		Name: name, Applicability: applicability, Status: status, ReviewMethod: "configuration and repository evidence",
+		Summary: summary, Evidence: evidence, Gaps: gaps, NextSteps: steps,
+	}
+}
+
+func documentControl(input Input, name, applicability, path, expectation string) schema.ControlAssessment {
+	rel, complete, reason := documentStatus(input, path)
+	evidence := []string{rel}
+	if rel == "" {
+		evidence = []string{"governance YAML field"}
+	}
+	status := "pass"
+	summary := "Documentation contains expected process signals: " + expectation + "."
+	var gaps, next []string
+	if !complete {
+		status = "needs-evidence"
+		summary = "Documentation is " + reason + "; expected " + expectation + "."
+		gaps = append(gaps, reason)
+		next = append(next, "Add real owners, process steps, thresholds, evidence links, review cadence, and approval or exception handling.")
+	} else {
+		next = append(next, "Manual review should confirm the process is approved, current, and followed.")
+	}
+	return schema.ControlAssessment{
+		Name: name, Applicability: applicability, Status: status, ReviewMethod: "document content check plus manual review",
+		Summary: summary, Evidence: evidence, Gaps: gaps, NextSteps: next,
+	}
+}
+
+func testCaseControl(input Input, name, applicability, categoryName, next string) schema.ControlAssessment {
+	status := "pass"
+	summary := "Matching evaluation cases are configured."
+	var gaps, steps []string
+	if categoryName == "grounding" {
+		if !hasAnyCategory(input.TestCases, "grounding", "hallucination") {
+			status = "needs-evidence"
+		}
+	} else if categoryName == "pii" {
+		if !hasAnyCategory(input.TestCases, "pii", "output-safety") {
+			status = "needs-evidence"
+		}
+	} else if !hasAnyCategory(input.TestCases, categoryName) {
+		status = "needs-evidence"
+	}
+	if status != "pass" {
+		summary = "No matching evaluation case was found."
+		gaps = append(gaps, "missing evaluation case")
+		steps = append(steps, next)
+	}
+	return schema.ControlAssessment{
+		Name: name, Applicability: applicability, Status: status, ReviewMethod: "test-case inventory",
+		Summary: summary, Evidence: input.TestSources, Gaps: gaps, NextSteps: steps,
+	}
+}
+
+func agentControl(input Input) schema.ControlAssessment {
+	applicable := strings.Contains(strings.ToLower(input.Config.Project.Type), "agent") || len(input.AgentSkills) > 0
+	if !applicable {
+		return schema.ControlAssessment{
+			Name: "Agent skill and tool-use controls", Applicability: "conditional", Status: "not-applicable", ReviewMethod: "configuration and target discovery",
+			Summary: "No agent workload type or agent skill path was found.", NextSteps: []string{"If the system can call tools or take actions, add agent skill manifests or tool configuration to the scan scope."},
+		}
+	}
+	status := "pass"
+	summary := "Agent skill paths or agent-safety test cases are configured."
+	var gaps, next []string
+	if len(input.AgentSkills) == 0 && !hasAnyCategory(input.TestCases, "agent-safety") {
+		status = "needs-evidence"
+		summary = "The workload appears agentic, but no agent skill evidence or agent-safety case was found."
+		gaps = append(gaps, "missing agent skill evidence")
+		next = append(next, "Add agent tool manifests, permission files, or agent-safety test cases.")
+	}
+	return schema.ControlAssessment{Name: "Agent skill and tool-use controls", Applicability: "conditional", Status: status, ReviewMethod: "configuration and file discovery", Summary: summary, Evidence: relativePaths(input.RootDir, input.AgentSkills), Gaps: gaps, NextSteps: next}
+}
+
+func terraformControl(input Input) schema.ControlAssessment {
+	files := existingRelativePaths(input.RootDir, config.Expand(input.RootDir, input.Config.Inputs.TerraformPlanJSON))
+	if len(files) == 0 {
+		return schema.ControlAssessment{
+			Name: "Infrastructure and runtime plan controls", Applicability: "conditional", Status: "needs-evidence", ReviewMethod: "Terraform plan JSON discovery",
+			Summary: "No Terraform plan JSON was found in configured inputs.", Evidence: input.Config.Inputs.TerraformPlanJSON,
+			Gaps: []string{"missing Terraform plan JSON"}, NextSteps: []string{"When infrastructure is managed by Terraform, run `terraform show -json` and add the plan JSON path to the scan."},
+		}
+	}
+	return schema.ControlAssessment{Name: "Infrastructure and runtime plan controls", Applicability: "conditional", Status: "pass", ReviewMethod: "Terraform plan JSON scan", Summary: "Terraform plan JSON is available for runtime, IAM, network, storage, database, and secret exposure checks.", Evidence: files, NextSteps: []string{"Manual review should confirm whether any public access or broad permissions are approved exceptions."}}
+}
+
+func existingRelativePaths(root string, paths []string) []string {
+	var values []string
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			rel, relErr := filepath.Rel(root, path)
+			if relErr != nil {
+				rel = path
+			}
+			values = append(values, filepath.ToSlash(rel))
+		}
+	}
+	return values
+}
+
+func latestScanControl(input Input, name, applicability string, categories ...string) schema.ControlAssessment {
+	if len(input.ToolResults) == 0 {
+		return schema.ControlAssessment{Name: name, Applicability: applicability, Status: "needs-evidence", ReviewMethod: "latest technical scan", Summary: "No latest scan evidence was found.", Evidence: []string{".infraseal/reports/latest-scan.json"}, Gaps: []string{"missing latest scan evidence"}, NextSteps: []string{"Run `infraseal scan --profile full` before compliance readiness."}}
+	}
+	if hasHighRiskFinding(input.ToolResults, categories...) {
+		return schema.ControlAssessment{Name: name, Applicability: applicability, Status: "needs-remediation", ReviewMethod: "latest technical scan", Summary: "Latest scan evidence contains high or critical findings relevant to this control.", Evidence: []string{".infraseal/reports/latest-scan.json"}, Gaps: []string{"high or critical findings remain open"}, NextSteps: []string{"Remediate findings, record risk acceptance if needed, and rerun focused checks."}}
+	}
+	return schema.ControlAssessment{Name: name, Applicability: applicability, Status: "pass", ReviewMethod: "latest technical scan", Summary: "No high or critical findings matched this control in the latest scan evidence.", Evidence: []string{".infraseal/reports/latest-scan.json"}}
+}
+
+func criticalClosureControl(input Input) schema.ControlAssessment {
+	if len(input.ToolResults) == 0 {
+		return schema.ControlAssessment{Name: "Critical finding closure", Applicability: "applicable", Status: "needs-evidence", ReviewMethod: "latest technical scan", Summary: "No latest scan evidence was found.", Evidence: []string{".infraseal/reports/latest-scan.json"}, Gaps: []string{"missing latest scan evidence"}, NextSteps: []string{"Run a full scan and review critical findings before release."}}
+	}
+	if hasCriticalFinding(input.ToolResults) {
+		return schema.ControlAssessment{Name: "Critical finding closure", Applicability: "applicable", Status: "needs-remediation", ReviewMethod: "latest technical scan plus manual closure review", Summary: "Critical findings remain open in the latest scan evidence.", Evidence: []string{".infraseal/reports/latest-scan.json"}, Gaps: []string{"open critical findings"}, NextSteps: []string{"Close critical findings or document accountable risk acceptance before release."}}
+	}
+	return schema.ControlAssessment{Name: "Critical finding closure", Applicability: "applicable", Status: "pass", ReviewMethod: "latest technical scan", Summary: "No critical findings are present in the latest scan evidence.", Evidence: []string{".infraseal/reports/latest-scan.json"}}
 }
 
 func missingDocumentEvidence(path, text string) []string {

@@ -60,3 +60,25 @@ func TestShouldExcludeSupportsCommonRepoGlobs(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadMergesDefaultExcludes(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, filepath.FromSlash(DefaultPath))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("project:\n  name: custom\ninputs:\n  exclude:\n    - secrets/**\n")
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []string{"secrets/key.txt", ".infraseal/reports/scan.json", ".infraseal/governance/risk-register.md"}
+	for _, item := range cases {
+		if !ShouldExclude(root, filepath.Join(root, filepath.FromSlash(item)), cfg.Inputs.Exclude) {
+			t.Fatalf("expected %s to be excluded after load", item)
+		}
+	}
+}

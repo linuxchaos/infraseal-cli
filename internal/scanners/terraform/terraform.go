@@ -450,5 +450,5 @@ var (
 )
 
 func categories() []string {
-	return []string{"runtime-security", "infrastructure-security", "data-governance", "iam-policy", "credential-exposure", "code-security"}
+	return []string{"runtime-security", "infrastructure-security", "data-governance", "iam-policy", "credential-exposure"}
 }

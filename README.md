@@ -4,7 +4,7 @@ InfraSeal is a local-first command-line tool for evaluating AI workloads, agenti
 
 It is built for developers and AI teams who need a practical way to answer a simple release question: what evidence do we have that this AI system is grounded, safe enough to ship, monitored, and reviewable?
 
-InfraSeal runs from the repository being assessed. It normalizes findings from native checks and optional evaluation backends, calculates a trust score, maps evidence to AI governance benchmarks, and writes local reports in JSON, Markdown, HTML, CSV, and PDF.
+InfraSeal can run directly against a target folder, or from inside a repository that has been initialized with `.infraseal/infraseal.yaml`. It normalizes findings from native checks and optional evaluation backends, calculates a trust score, maps evidence to AI governance benchmarks, and writes local reports in JSON, Markdown, HTML, CSV, and PDF.
 
 The orchestration layer is MCPvia, which resolves inputs, chooses scan profiles, runs evaluators, normalizes findings, maps benchmark evidence, and generates reports.
 
@@ -67,7 +67,7 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 python -m pip install git+https://github.com/NVIDIA/SkillSpector.git
 ```
 
-InfraSeal does not require every optional tool before it can run. Missing evaluators are reported as unavailable and do not produce synthetic findings. Native checks, deterministic grounding checks, Terraform plan review, compliance readiness, and report generation still work locally.
+InfraSeal does not require every optional tool before it can run. Missing evaluators are reported as unavailable and do not create findings. Native checks, deterministic grounding checks, Terraform plan review, compliance readiness, and report generation still work locally. When Promptfoo is installed but no Promptfoo config exists, InfraSeal can generate an offline Promptfoo config from `.infraseal/test-cases/*.yaml` and run those cases through Promptfoo.
 
 ### macOS
 
@@ -114,14 +114,18 @@ The repository includes a realistic sample workload at `samples/rag-support-agen
 Run:
 
 ```bash
+go run ./cmd/infraseal scan --profile full --target samples/rag-support-agent --format json --format markdown --format html --format csv --format pdf --include-tool-details
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml doctor
-go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml scan --profile full --format json --format markdown --format html --format csv --format pdf
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance iso42001
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance nist-ai-rmf
 go run ./cmd/infraseal --config samples/rag-support-agent/.infraseal/infraseal.yaml compliance aiuc1
 ```
 
+The first command can be run from the CLI repo root. InfraSeal sees that the target folder already contains `.infraseal/infraseal.yaml`, uses that config automatically, and scans the whole sample directory.
+
 Additional pass/fail tool cases live under `samples/tool-cases/`. They are small by design and let you verify each scanner path against a clean input and an intentionally risky input.
+
+See [examples/local-verification.md](examples/local-verification.md) for the scanner pass/fail matrix.
 
 Example output:
 
@@ -161,14 +165,16 @@ Evaluation Coverage: MCPvia native active; 6 real, 1 native, 3 missing, 1 disabl
 From the root of the repository you want to assess:
 
 ```bash
+infraseal scan --profile full --target .
 infraseal init
 infraseal doctor
-infraseal scan --profile quick
 infraseal scan --profile full
 infraseal compliance iso42001
 ```
 
-`infraseal init` creates `.infraseal/infraseal.yaml` plus starter evidence, test cases, governance templates, an agent skill manifest, a reports folder, and a starter system prompt. It does not upload data, install third-party tools, call a model API, or start a service.
+The first command is the fastest technical scan and works even before initialization. It uses an in-memory default config, scans the target folder, and writes reports to `.infraseal/reports/`.
+
+`infraseal init` creates `.infraseal/infraseal.yaml` plus starter evidence, test cases, governance templates, an agent skill manifest, a reports folder, and a starter system prompt. It does not upload data, install third-party tools, call a model API, or start a service. After initialization, `infraseal scan --profile full` uses the repo-owned YAML and scans `.` with default excludes.
 
 Replace the starter files with real repository evidence, then update the YAML:
 
@@ -188,20 +194,19 @@ inputs:
   agent_skills:
     - agents/
   include:
-    - app/
-    - prompts/
-    - exports/
-    - infra/
-    - agents/
+    - .
   exclude:
     - .git/**
+    - .github/**
+    - .infraseal/governance/**
     - node_modules/**
     - vendor/**
+    - .infraseal/test-cases/**
     - .infraseal/reports/**
   terraform_plan_json:
     - infra/tfplan.json
 output:
-  formats: [json, markdown, html, csv]
+  formats: [json, markdown, html, csv, pdf]
 settings:
   block_on_critical: true
   minimum_readiness_score: 80
@@ -264,6 +269,10 @@ InfraSeal works without cloud credentials. Optional backends can add deeper eval
 ## Taubyte Runtime
 
 The Taubyte runtime provider is scaffolded but not live. `--runtime taubyte` currently falls back to local execution when `runtime.fallback: local` is configured. The planned integration is a sandbox deployment flow that provisions an isolated Taubyte or cloud-native environment, runs the workload there, and returns scan evidence to InfraSeal. See [docs/taubyte-runtime.md](docs/taubyte-runtime.md).
+
+## Future Compliance Workflow
+
+The ISO readiness pack now reports per-clause control assessments with applicability, status, evidence checked, gaps, and next steps. A planned workflow will add a step-by-step questionnaire for non-technical controls, then optionally use a customer-controlled AI reviewer to extract evidence from policy documents and summarize whether processes appear complete. That future mode should keep source material local or inside customer-owned infrastructure and preserve reviewer prompts, excerpts, model settings, and decision traces.
 
 ## Documentation
 

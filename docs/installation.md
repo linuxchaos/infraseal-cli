@@ -48,13 +48,16 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 
 ```bash
 cd path/to/customer-ai-repository
+/path/to/infraseal scan --profile full --target .
 /path/to/infraseal init
 /path/to/infraseal doctor
-/path/to/infraseal scan --profile quick
+/path/to/infraseal scan --profile full
 /path/to/infraseal compliance iso42001
 /path/to/infraseal compliance nist-ai-rmf
 /path/to/infraseal compliance aiuc1
 ```
+
+The first scan works before initialization. It uses the target folder as the project root, scans it with default exclusions, and writes reports under `.infraseal/reports/`. Use `init` when the team wants repository-owned governance evidence, test cases, prompt/evidence paths, and compliance readiness.
 
 You do not copy or reference the sample YAML. `init` generates a configuration owned by the repository you are assessing. When `.infraseal/infraseal.yaml` is used, relative input and target paths resolve from that repository's root.
 
@@ -62,7 +65,7 @@ After initialization:
 
 1. Set `project.name`, `project.type`, `project.purpose`, and `project.owner`.
 2. Replace the starter evidence and test cases with real repository-specific material.
-3. Set `inputs.prompts`, `inputs.evidence`, `inputs.test_cases`, `inputs.agent_skills`, `inputs.include`, `inputs.exclude`, and `inputs.targets` to files that actually exist in the repository.
+3. Keep `inputs.include: [.]` for a broad repo scan, or narrow it to the folders that contain prompts, exports, source, infrastructure, and agent skills.
 4. Add governance evidence files under `.infraseal/governance/` or update the YAML paths to your existing policy/risk/approval documentation.
 5. Set `output.formats` to any combination of `json`, `markdown`, `html`, `csv`, and `pdf`.
 6. Run `infraseal doctor` before the first scan.
@@ -89,20 +92,21 @@ It does not install tools, upload source code, call a model provider, create an 
 
 ## Immediate Zero-Configuration Path
 
-1. Run `infraseal init`.
-2. Replace starter evidence and test content with repository-specific files.
-3. Update paths and project metadata in `.infraseal/infraseal.yaml`.
-4. Run `infraseal doctor`.
-5. Optional: generate Terraform plan evidence with `terraform plan -out=tfplan.bin && terraform show -json tfplan.bin > infra/tfplan.json`.
-6. Run `infraseal scan --profile quick`.
-7. Run `infraseal compliance iso42001`.
-8. Run `infraseal compliance nist-ai-rmf` or `infraseal compliance aiuc1` when those views are useful to the team.
+1. Run `infraseal scan --profile full --target .` for an immediate technical scan.
+2. Run `infraseal init` to create a repository-owned governance workspace.
+3. Replace starter evidence and test content with repository-specific files.
+4. Keep `inputs.include: [.]`, then adjust `inputs.exclude` for generated folders and large artifacts.
+5. Run `infraseal doctor`.
+6. Optional: generate Terraform plan evidence with `terraform plan -out=tfplan.bin && terraform show -json tfplan.bin > infra/tfplan.json`.
+7. Run `infraseal scan --profile full`.
+8. Run `infraseal compliance iso42001`.
+9. Run `infraseal compliance nist-ai-rmf` or `infraseal compliance aiuc1` when those views are useful to the team.
 
 Optional backend integrations add depth. They are not required for MCPvia native checks or local reports. See `scanner-integrations.md` for those requirements.
 
 ## Optional Evaluator Setup
 
-InfraSeal is useful without any optional evaluator CLI. A first run can still inspect configured test cases, exported chatbot responses, Terraform plan JSON, governance evidence, and native targeted patterns. Optional tools add deeper checks when the repository contains matching files.
+InfraSeal is useful without any optional evaluator CLI. A first run can still inspect configured test cases, exported chatbot responses, Terraform plan JSON, governance evidence, Python/Go code patterns, and native targeted patterns. Optional tools add deeper checks when the repository contains matching files.
 
 Common local setup:
 
@@ -136,13 +140,16 @@ Missing optional tools do not produce findings. They are reported as unavailable
 In a normal repository, do this from the repository root:
 
 ```bash
+infraseal scan --profile full --target .
 infraseal init
 ```
+
+The first command runs without a config and is useful for source, prompt, infrastructure, agent-skill, exported-output, and secret-pattern checks. The second command creates the governance workspace needed for repeatable scans and readiness reports.
 
 Then edit `.infraseal/infraseal.yaml` to point at the repository's real files. At minimum, set:
 
 - `project.name`, `project.type`, `project.purpose`, and `project.owner`
-- `inputs.include` for folders to scan
+- `inputs.include` for folders to scan; the generated default is `.`
 - `inputs.exclude` for generated files, vendored code, reports, and large assets
 - `inputs.prompts` for prompt templates or system prompts
 - `inputs.evidence` for approved policy, knowledge, retrieval, or product evidence
@@ -165,3 +172,5 @@ Then run the broader release check:
 infraseal scan --profile full --format json --format markdown --format html --format csv
 infraseal compliance iso42001 --format markdown --format html
 ```
+
+Compliance readiness is intentionally separate from `scan`. A full scan produces the technical evidence; readiness commands assess repository-owned governance evidence plus the latest scan result. Starter Markdown templates do not count as complete readiness evidence until the TODO content is replaced with real owners, decisions, thresholds, controls, and evidence links.

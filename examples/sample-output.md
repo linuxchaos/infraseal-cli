@@ -8,25 +8,31 @@ InfraSeal AI Assurance
 Project:      rag-support-agent
 Workload:     rag-agent
 Profile:      full
-Targets:      prompts, app, exports, infra, .infraseal/agent-skills
+Targets:      .
 Runtime:      local
 Trust Score:  0/100
 Decision:     FAIL
 
 Assurance Domains
-  Security            45%  NEEDS-ATTENTION 3 correlated finding(s) require review.
+  Security             0%  NEEDS-ATTENTION 8 correlated finding(s) require review.
   Grounding           70%  NEEDS-ATTENTION 2 correlated finding(s) require review.
   Privacy            100%  PASS            No blocking gaps detected in this domain.
-  Agent Safety       100%  PASS            No blocking gaps detected in this domain.
-  Code Security       37%  NEEDS-ATTENTION 4 correlated finding(s) require review.
+  Agent Safety        25%  NEEDS-ATTENTION 3 correlated finding(s) require review.
+  Code Security        0%  NEEDS-ATTENTION 9 correlated finding(s) require review.
   Governance          85%  PASS            1 correlated finding(s) require review.
 
 Findings
-  CRITICAL Security         Data access without tenant filter - cross-tenant access risk
+  CRITICAL Security         Direct instruction override in user input
+  CRITICAL Agent Safety     subprocess call detected with shell=True
+  CRITICAL Security         OpenAI API key detected in source code
+  CRITICAL Code Security    Shell injection risk - subprocess shell=True / ProcessBuilder / exec.Command with concatenation
+  CRITICAL Agent Safety     Tool spawns child processes - arbitrary command execution risk
   CRITICAL Code Security    Terraform plan exposes inbound access to the internet
   HIGH     Grounding        unsupported 90-day refund claim
   HIGH     Security         prompt injection disclosure
   HIGH     Grounding        Unsupported production chatbot claim detected: 90-day unconditional refund
+  HIGH     Code Security    No resource limits on code execution
+  HIGH     Code Security    setup.py contains code execution - supply chain attack vector
   HIGH     Code Security    Terraform plan makes a database publicly accessible
   HIGH     Governance       Terraform plan disables database storage encryption
   HIGH     Security         Terraform plan contains a secret-like literal value
@@ -64,14 +70,14 @@ Clause 7 - Support
   PASS  100%
 
 Clause 8 - Operation
-  PASS  85%
+  WARN  85%
   WARN  High or critical operational findings are present in latest scan evidence
 
 Clause 9 - Performance Evaluation
-  PASS  80%
+  WARN  80%
   WARN  Latest scan evidence contains high or critical measurement findings
 
 Clause 10 - Improvement
-  PASS  90%
+  WARN  90%
   WARN  Critical findings remain open in latest scan evidence
 ```

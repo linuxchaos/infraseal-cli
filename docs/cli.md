@@ -26,21 +26,20 @@ inputs:
     - exports/chatbot-responses.jsonl
     - infra/tfplan.json
   include:
-    - prompts/
-    - src/
-    - app/
-    - exports/
-    - infra/
-    - .infraseal/agent-skills/
+    - .
   exclude:
     - .git/**
+    - .github/**
+    - .infraseal/governance/**
+    - .infraseal/test-cases/**
     - node_modules/**
+    - vendor/**
     - .infraseal/reports/**
     - '**/*.pdf'
   terraform_plan_json:
     - infra/tfplan.json
 output:
-  formats: [json, markdown, html, csv]
+  formats: [json, markdown, html, csv, pdf]
 settings:
   show_tool_details: false
   block_on_critical: true
@@ -67,7 +66,9 @@ governance:
   remediation_tracking: GitHub issues with owner, due date, and closure evidence.
 ```
 
-`targets` is the default scan surface. `include` can be used as the cleaner repo-wide scope for normal scans. `exclude` removes folders/files from target expansion and native file walking. CLI flags can override per run:
+`targets` is the default scan surface. `include` can be used as the cleaner repo-wide scope for normal scans. The generated default is `include: [.]`, which means InfraSeal scans the repository root while respecting exclusions. `exclude` removes folders/files from target expansion and native file walking. CLI flags can override per run:
+
+The default exclusions skip generated dependency folders, report artifacts, binary assets, and `.infraseal/governance/**`. Governance documents are assessed by `infraseal compliance`, not treated as runtime code or prompt data during a broad technical scan.
 
 ```bash
 infraseal scan --profile full --target src/ --target infra/tfplan.json --exclude vendor/** --format html --format csv
@@ -82,6 +83,7 @@ The generated files are intentionally editable. Governance templates contain `TO
 ## `infraseal scan`
 
 ```bash
+infraseal scan --profile full --target .
 infraseal scan --profile quick
 infraseal scan --profile rag --include-tool-details
 infraseal scan --profile full --fail-on-gate
@@ -89,9 +91,12 @@ infraseal scan --check hallucination --target exports/chatbot-responses.jsonl
 infraseal scan --check prompt-injection --target prompts/
 infraseal scan --check pii --target exports/
 infraseal scan --check agent-safety --target agents/
+infraseal scan --check code-security --target app/
 infraseal scan --check runtime-security --target infra/tfplan.json
 infraseal scan --check dependency-risk --target app/
 ```
+
+If `.infraseal/infraseal.yaml` is not present, `scan --target .` runs a first technical scan using an in-memory default config. If the target folder already contains `.infraseal/infraseal.yaml`, InfraSeal discovers and uses it automatically.
 
 `--fail-on-gate` is intended for CI. Local scans report the decision without forcing a non-zero exit by default.
 
