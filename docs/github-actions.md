@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
 
       - uses: actions/setup-node@v7
         with:
@@ -114,6 +114,6 @@ Reports are still uploaded with `if: always()`, so reviewers can inspect the fin
 
 ## Notes On Coverage
 
-The workflow installs the common open-source evaluator CLIs that InfraSeal can orchestrate. If a repository does not contain matching inputs, a capability may still be disabled for that run. For example, source-security checks require `go.mod`, infrastructure checks require Terraform plan JSON, and prompt red-team checks require a Promptfoo configuration.
+The workflow installs the common open-source evaluator CLIs that InfraSeal can orchestrate. The CLI module targets Go 1.24, but current source-security tooling may require Go 1.25 or newer to install. If a repository does not contain matching inputs, a capability may still be disabled for that run. For example, source-security checks require `go.mod`, infrastructure checks require Terraform plan JSON, and prompt red-team checks require a Promptfoo configuration.
 
 Readiness commands do not launch scanner adapters. Run `infraseal scan` first, then run `infraseal compliance iso42001` so the readiness report can load the latest technical evidence.
