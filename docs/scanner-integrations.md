@@ -123,7 +123,7 @@ go install github.com/securego/gosec/v2/cmd/gosec@latest
 
 The target repository must contain `go.mod`.
 
-Recent `gosec@latest` releases require Go 1.25 or newer to install. Use a newer local toolchain for evaluator installation, or pin a compatible `gosec` version if your workstation must stay on an older Go release.
+Recent `gosec@latest` releases require Go 1.25 or newer to install, and recent dependency-scanner releases may require Go 1.26 or newer. Use a newer local toolchain for evaluator installation, or pin compatible versions if your workstation must stay on an older Go release.
 
 ## govulncheck
 
@@ -134,6 +134,8 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 ```
 
 The target repository must contain `go.mod`.
+
+Recent `govulncheck@latest` releases may require Go 1.26 or newer to install.
 
 ## Verify Coverage
 

@@ -113,7 +113,7 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 python -m pip install git+https://github.com/NVIDIA/SkillSpector.git
 ```
 
-InfraSeal targets Go 1.24 or newer. Some optional evaluator CLIs may raise their own toolchain requirements; for example, recent `gosec@latest` releases require Go 1.25 or newer to install.
+InfraSeal targets Go 1.24 or newer. Some optional evaluator CLIs may raise their own toolchain requirements; recent source-security and dependency scanner releases may require Go 1.26 or newer to install.
 
 The `g0` evaluator is invoked through `npx`, so Node.js and npm are enough:
 
